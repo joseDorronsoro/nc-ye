@@ -1,0 +1,121 @@
+
+Experiment configuration:
+ExperimentConfig(bunch_file='bunch_mnist.joblib', batch_size=128, epochs=350, reps=1, seed=42, gpu='1', optimizer='sgd', loss='mse', frac=0.005, lrate_factor=1.0, encoding='ohe', save_results=False)
+
+.......... hostname: hoya.ccc.uam.es
+results_dir: /home/proyectos/ada2/jdorrons/ongoing/nn_collapse/mnist_test/frac_0.005_128_1.0/
+Using GPU: cuda:1
+
+____________________ starting at 2026-07-16 14:54:38.339357+00:00
+
+.................... running repetition 0
+ExperimentConfig(bunch_file='bunch_mnist.joblib', batch_size=128, epochs=350, reps=1, seed=42, gpu='1', optimizer='sgd', loss='mse', frac=0.005, lrate_factor=1.0, encoding='ohe', save_results=False)
+epoch=   1 mse=0.012786
+..... test majority acc. 0.9838
+..... test minority acc. 0.0000
+epoch=  50 mse=0.000985
+..... test majority acc. 0.9977
+..... test minority acc. 0.0673
+epoch= 100 mse=0.000117
+..... test majority acc. 0.9982
+..... test minority acc. 0.5268
+epoch= 150 mse=0.000101
+..... test majority acc. 0.9992
+..... test minority acc. 0.8044
+epoch= 200 mse=0.000051
+..... test majority acc. 0.9994
+..... test minority acc. 0.8015
+epoch= 250 mse=0.000059
+..... test majority acc. 0.9994
+..... test minority acc. 0.8099
+epoch= 300 mse=0.000045
+..... test majority acc. 0.9994
+..... test minority acc. 0.8099
+epoch= 350 mse=0.000036
+..... test majority acc. 0.9994
+..... test minority acc. 0.7945
+Final scores
+mse=0.000036
+..... test majority acc. 0.9994
+..... test minority acc. 0.7945
+
+train nc_analysis ....................
+.......... model loss
+mse: 3.590711936870327e-05
+.......... model acc
+train conf matrix
+ [[5000    0    0    0    0    0    0    0    0    0]
+ [   0 5000    0    0    0    0    0    0    0    0]
+ [   0    0 5000    0    0    0    0    0    0    0]
+ [   0    0    0 5000    0    0    0    0    0    0]
+ [   0    0    0    0 5000    0    0    0    0    0]
+ [   0    0    0    0    0   25    0    0    0    0]
+ [   0    0    0    0    0    0   25    0    0    0]
+ [   0    0    0    0    0    0    0   25    0    0]
+ [   0    0    0    0    0    0    0    0   25    0]
+ [   0    0    0    0    0    0    0    0    0   25]]
+train_acc 1.0
+balanced_acc 1.0
+.......... NCC1
+max of Sw: values 8.814707352750847e-05
+trace Sw_invSb 0.024996738966990752
+.......... NCC2
+eq norm of centered class means 0.57767814
+eq norm of lhl weights 0.42945883
+norm of ccm cos matrix - simplex matrix 0.022494962729018353
+norm of lhl weights cos matrix - simplex matrix 0.006508306383650626
+.......... NCC3
+duality of ccmeans and lhl weights 0.9385528
+.......... NCC4
+conf m of nearest class center prediction
+ [[5000    0    0    0    0    0    0    0    0    0]
+ [   0 5000    0    0    0    0    0    0    0    0]
+ [   0    0 5000    0    0    0    0    0    0    0]
+ [   0    0    0 5000    0    0    0    0    0    0]
+ [   0    0    0    0 5000    0    0    0    0    0]
+ [   0    0    0    0    0   25    0    0    0    0]
+ [   0    0    0    0    0    0   25    0    0    0]
+ [   0    0    0    0    0    0    0   25    0    0]
+ [   0    0    0    0    0    0    0    0   25    0]
+ [   0    0    0    0    0    0    0    0    0   25]]
+acc of nearest class center prediction 1.0
+coincidence of model and ncc predictions 1.0
+
+test nc_analysis ....................
+.......... test model loss
+mse: 0.01550913948523058
+
+.......... test model acc
+test_acc 0.8998
+test balanced_acc 0.8973195895577659
+test conf matrix
+ [[ 980    0    0    0    0    0    0    0    0    0]
+ [   0 1134    0    1    0    0    0    0    0    0]
+ [   1    0 1030    0    1    0    0    0    0    0]
+ [   0    0    0 1010    0    0    0    0    0    0]
+ [   0    0    0    0  982    0    0    0    0    0]
+ [  13    3    1  147    2  725    0    0    1    0]
+ [  94   14   10    1   41    8  789    0    1    0]
+ [   8   27  126   26   32    0    0  806    0    3]
+ [  37    1   41   85   31    1    0    2  768    8]
+ [  15    5    2   25  178    5    0    2    3  774]]
+.......... NCC4
+test conf m of nearest class center prediction
+ [[ 980    0    0    0    0    0    0    0    0    0]
+ [   0 1134    0    1    0    0    0    0    0    0]
+ [   1    0 1031    0    0    0    0    0    0    0]
+ [   0    0    0 1010    0    0    0    0    0    0]
+ [   0    0    0    0  982    0    0    0    0    0]
+ [  20    9    9  203    5  646    0    0    0    0]
+ [ 133   18   20    1   57    4  725    0    0    0]
+ [  19   36  172   30   45    0    0  725    0    1]
+ [  67    4   69  117   43    0    0    0  669    5]
+ [  24    5    8   38  230    0    0    1    1  702]]
+test acc of nearest class center prediction 0.8604
+test coincidence of model and ncc predictions 0.9569
+..... test majority acc. 0.9994
+..... test minority acc. 0.7945
+
+____________________ ending at 2026-07-16 15:47:59.688412+00:00
+
+total_time: 0:53:21.349055
