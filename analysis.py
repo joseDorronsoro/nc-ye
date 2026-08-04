@@ -125,7 +125,7 @@ def evaluate_model(
     class_prob = np.sort(
         counts / counts.sum()
     )[::-1]
-    #print('class_prob', class_prob)
+    #print('intermediate class_prob', class_prob)
     
     return majority_minority_accuracy(
         test_predictions,
@@ -153,7 +153,7 @@ def evaluate_maj_min_preds(
     
     if encoding == 'ye':
         class_prob = probs(n_classes, frac)
-                
+        #print('final', class_prob)
     elif encoding == 'ohe': 
         class_prob = None
     

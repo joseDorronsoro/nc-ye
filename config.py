@@ -42,7 +42,11 @@ class ExperimentConfig:
 
     encoding: str = "ye"
 
+    resampling_factor: float = 1.0
+    
     save_results: bool = False
+    
+    frozen_weights: int = 0
 
 
 def set_seed(seed: int):
@@ -165,12 +169,23 @@ def parse_args():
         default=42,
         help="Random seed; default: 42",
     )
-    #parser.add_argument(
-    #    "-sv",
-    #    "--save_results",
-    #    action="store_true",
-    #)
-
+    
+    parser.add_argument(
+        "-rsf",
+        "--resampling_factor",
+        type=float,
+        default=1.0,
+        help="Minority class resampling ratio; default: 1.0, no resampling and use standard Torch loader",
+    )
+    
+    parser.add_argument(
+        "-frw",
+        "--frozen_weights",
+        type=int,
+        default=0,
+        help="Flag for frozen weigh training. Default: 0, train lhl weights and bias",
+    )
+    
     return parser.parse_args()
 
 
@@ -193,8 +208,9 @@ def build_config(args):
         frac=args.frac,
         lrate_factor=args.lrate_factor,
         encoding=args.encoding,
-        save_results=bool(args.save_results)
-        #save_results=args.save_results,
+        save_results=bool(args.save_results),
+        resampling_factor=args.resampling_factor,
+        frozen_weights=bool(args.frozen_weights)
     )
 
 

@@ -1,9 +1,10 @@
 # ------------------------------------------------------------------ Unchanged:
+#import sys
 import joblib
 import numpy as np
 
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torchvision import transforms
 
 
@@ -61,7 +62,7 @@ class MyData(Dataset):
         return sample, self.y[index]
 
 
-def loader_from_numpy(x, y, x_ts, y_ts, batch_size=128, train_shuffle=False):
+def loader_from_numpy00(x, y, x_ts, y_ts, batch_size=128, train_shuffle=True):
     """
     Loads data into PyTorch DataLoaders with optional shuffling.
 
@@ -106,6 +107,104 @@ def loader_from_numpy(x, y, x_ts, y_ts, batch_size=128, train_shuffle=False):
     
     train_data = MyData(xx, y, transform)
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=train_shuffle)
+
+    test_data = MyData(xx_ts, y_ts, transform)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
+
+    return train_loader, test_loader
+
+
+def loader_from_numpy(x, y, x_ts, y_ts, batch_size=128, 
+        #train_shuffle=False,
+        resampling_factor=1.
+    ):
+    """
+    Loads data into PyTorch DataLoaders with optional shuffling and
+    resampling of the the minority class.
+    Asssumes specific MNIST bunch fila, with initial class sizes being 5000.
+    Resampled minority class size will be min initial size x resampling_factor.
+
+    Args:
+        x (np.ndarray or torch.Tensor): Training data.
+        y (np.ndarray or torch.Tensor): Training labels.
+        x_ts (np.ndarray or torch.Tensor): Test data.
+        y_ts (np.ndarray or torch.Tensor): Test labels.
+        shuffle (bool): Whether to shuffle the training data. Test data is not shuffled
+        resampling_factor (float): resampled minority class fraction wr maj class size
+            If 1.0, standard torch Loader with shuffling is used
+
+    Returns:
+        tuple: (train_loader, test_loader)
+
+    Raises:
+        TypeError: If x, y, x_ts, or y_ts are not numpy arrays or torch tensors.
+        ValueError: If x and y or x_ts and y_ts do not have the same number of samples.
+    """
+    # Argument control
+    if not (isinstance(x, (np.ndarray, torch.Tensor)) and isinstance(x_ts, (np.ndarray, torch.Tensor))):
+        raise TypeError("x and x_ts must be numpy arrays or torch tensors.")
+    if not (isinstance(y, (np.ndarray, torch.Tensor)) and isinstance(y_ts, (np.ndarray, torch.Tensor))):
+        raise TypeError("y and y_ts must be numpy arrays or torch tensors.")
+    if x.shape[0] != y.shape[0]:
+        raise ValueError("x and y must have the same number of samples.")
+    if x_ts.shape[0] != y_ts.shape[0]:
+        raise ValueError("x_ts and y_ts must have the same number of samples.")
+
+    mm, ss = x.mean(), x.std()
+
+    # mnist image params
+    im_size = 28
+    padded_im_size = 32
+    transform = transforms.Compose(
+        [
+            transforms.Pad((padded_im_size - im_size) // 2),
+            transforms.Normalize(mm, ss),
+        ]
+    )
+
+    xx = torch.Tensor(x.reshape(-1, 1, 28, 28))
+    xx_ts = torch.Tensor(x_ts.reshape(-1, 1, 28, 28))
+    
+    train_data = MyData(xx, y, transform)
+    
+    if resampling_factor == 1.:
+        #use a standard loader
+        print('\n' + 30 * '.' + "using standard loader with shuffling\n", flush=True)
+        train_loader = DataLoader(train_data, 
+            batch_size=batch_size, 
+            shuffle=True
+        )
+
+    else:
+        print('\n' + 30 * '.' + 'using resampler\n', flush=True)
+        
+        #resampler
+        y_labels = np.argmax(y, axis=1)
+        class_counts = np.bincount(y_labels)
+        
+        # Minority classes (5..9) get a weight resampling_factor-timesx larger than majority classes (0..4)
+        resampled_class_counts = np.array(list(class_counts[ : 5]) + list((resampling_factor * class_counts[5 : ]).astype(int)))
+        print('initial class_counts\t', class_counts, '\nresampled_class_counts\t', resampled_class_counts, '\n')
+    
+        # --- Map Class Weights to Every Sample ---
+        # Array indexing assigns each sample its class's specific probability weight
+        sample_weights = resampled_class_counts[y_labels]
+        print(sample_weights[y_labels == 0])
+        print(sample_weights[y_labels == 9])
+        
+        sample_weights = torch.from_numpy(sample_weights).double()
+        # --- Instantiate Sampler & DataLoader ---
+        sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(sample_weights),  # Keep epoch size at 25,250 steps
+            replacement=True                  # Crucial for oversampling minority classes
+        )
+
+        train_loader = DataLoader(train_data, 
+            batch_size=batch_size, 
+            sampler=sampler,
+            shuffle=False
+        )
 
     test_data = MyData(xx_ts, y_ts, transform)
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
@@ -230,7 +329,7 @@ def imbalanced_subsampling(
     return x_train, yy_train, x_test, yy_test
 
 
-def load_dataset(cfg, data_dir):
+def load_dataset00(cfg, data_dir):
     """
     Load the experimental dataset and prepare it for training.
 
@@ -267,6 +366,50 @@ def load_dataset(cfg, data_dir):
             y_ts,
             batch_size=cfg.batch_size,
             train_shuffle=True,
+        )
+    )
+
+    return train_loader, test_loader
+
+
+def load_dataset(cfg, data_dir):
+    """
+    Load the experimental dataset and prepare it for training.
+
+    The function performs imbalanced subsampling, target encoding
+    (OHE or Ye) and DataLoader construction according to the
+    experiment configuration.
+    """
+
+    full_class_size = (
+        6000
+        if "fashion_mnist" in cfg.bunch_file
+        else 5000
+    )
+
+    bunch = joblib.load(
+        data_dir + cfg.bunch_file
+    )
+
+    x_tr, y_tr, x_ts, y_ts = (
+        imbalanced_subsampling(
+            bunch=bunch,
+            full_class_size=full_class_size,
+            full_class_labels=[0, 1, 2, 3, 4],
+            frac=cfg.frac,
+            target_encoding=cfg.encoding,
+        )
+    )
+
+    train_loader, test_loader = (
+        loader_from_numpy(
+            x_tr,
+            y_tr,
+            x_ts,
+            y_ts,
+            batch_size=cfg.batch_size,
+            #train_shuffle=True,
+            resampling_factor=cfg.resampling_factor
         )
     )
 
