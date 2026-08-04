@@ -126,6 +126,7 @@ def run_experiment(
         batch_size=cfg.batch_size,
         optimizer_str=cfg.optimizer,
         lrate_factor=cfg.lrate_factor,
+        weight_decay=cfg.weight_decay,
         frozen_weights=cfg.frozen_weights,
         #resampling_factor=cfg.resampling_factor,
         device=device,
@@ -135,6 +136,7 @@ def run_experiment(
 def main(epochs, train_loader, #train_loader_resampled, 
         test_loader, loss_name, encoding, 
         batch_size, optimizer_str, lrate_factor, 
+        weight_decay,
         #resampling_factor, 
         frozen_weights,
         device):
@@ -163,6 +165,7 @@ def main(epochs, train_loader, #train_loader_resampled,
                                         loss_name=loss_name,
                                         optimizer_name=optimizer_str,
                                         lr_factor=lrate_factor,
+                                        weight_decay=weight_decay,
                                         epochs=epochs,
                                         frozen_weights=frozen_weights)
 
@@ -212,6 +215,7 @@ def save_experiment_results(
         f"{cfg.optimizer}_"
         f"{cfg.batch_size}_"
         f"{cfg.lrate_factor}_"
+        f"{cfg.weight_decay}_"
         f"{cfg.epochs}_"
         f"{rep_number}_"
     )
@@ -259,6 +263,7 @@ def dump_mse(
         f"{cfg.optimizer}_"
         f"{cfg.batch_size}_"
         f"{cfg.lrate_factor}_"
+        f"{cfg.weight_decay}_"
         f"{cfg.epochs}_"
         f"{rep_number}_"
     )

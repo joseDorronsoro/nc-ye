@@ -46,6 +46,8 @@ class ExperimentConfig:
     
     save_results: bool = False
     
+    weight_decay: float = 5.e-4
+    
     frozen_weights: int = 0
 
 
@@ -148,6 +150,14 @@ def parse_args():
     )
 
     parser.add_argument(
+        "-wd",
+        "--weight_decay",
+        type=float,
+        default=5.e-4,
+        help="default: 5.e-4, ok for sgd on mnist; for adamw try higher values",
+    )
+
+    parser.add_argument(
         "-en",
         "--encoding",
         choices=["ohe", "ye"],
@@ -207,6 +217,7 @@ def build_config(args):
         loss=args.loss,
         frac=args.frac,
         lrate_factor=args.lrate_factor,
+        weight_decay=args.weight_decay,
         encoding=args.encoding,
         save_results=bool(args.save_results),
         resampling_factor=args.resampling_factor,

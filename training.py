@@ -14,12 +14,13 @@ from analysis import (
 )
 
 LR_MILESTONES = [150, 300, 600, 1200, 2400]
+LR_SGD = 0.0184     #as used in Papyan; about 1.e-2
 LR_DECAY = 0.1
 WEIGHT_DECAY = 5e-4
 MOMENTUM = 0.9
 NUM_CLASSES = 10
 MINIMUM_LR_FACTOR = 1.e-2
-LR_ADAMW = 1.e-5
+LR_ADAMW = 1.e-5 # better use Papyan's and multiply it but an appropriate lr_factor, e.g. 1.e-3
 #MOMENTUM_ADAMW = 0.9 #use defaults
 WEIGHT_DECAY_ADAMW = 1.e-1 #5.e-4 
 
@@ -35,9 +36,9 @@ def get_learning_rate(loss_name, lrate_factor):
         return 0.0679
 
     if lrate_factor == 999.:
-        return 0.0184 / 2.8461
+        return LR_SGD / 2.8461
 
-    return 0.0184 * lrate_factor
+    return LR_SGD * lrate_factor
 
 
 #________ resnet18 model with frozen lhl weights, bias ________________________
@@ -101,14 +102,15 @@ def build_optimizer(
         loss_name='MSELoss',
         optimizer_name='sgd',
         lr_factor=1.,
+        weight_decay=WEIGHT_DECAY,
         epochs=350,
         frozen_weights=False):
     """
     Construct the optimizer and learning-rate scheduler.
     """
     lr = get_learning_rate(loss_name,
-                      lr_factor)
-
+                           lr_factor)
+                           
     if frozen_weights == True:
         fc_params = set(map(id, model.fc.parameters()))
     
@@ -132,7 +134,7 @@ def build_optimizer(
         optimizer = optim.SGD(
             params=params, 
             momentum=MOMENTUM,
-            weight_decay=WEIGHT_DECAY,
+            weight_decay=weight_decay,
         )
 
         #scheduler = optim.lr_scheduler.MultiStepLR(
@@ -164,7 +166,7 @@ def build_optimizer(
             # Instantiate AdamW without filtering out frozen parameters for now
             params = [{'params': model.parameters(), 'lr': lr_factor * LR_ADAMW}], 
             #momentum=MOMENTUM_ADAMW,
-            weight_decay=WEIGHT_DECAY_ADAMW
+            weight_decay=weight_decay, #WEIGHT_DECAY_ADAMW
         )
 
         #scheduler = None
@@ -329,7 +331,7 @@ def train_loop(model,
             
             print('..... checking grad norms')
             print("\tfc.weight norm; should stay near constant when freezing weights:", model.fc.weight.norm().item())
-            print("\tLayer4 grad norm; should eventually decrease:", model.layer4[1].conv2.weight.grad.abs().mean().item())
+            print("\tLayer4 abs grad mean; should eventually decrease:", model.layer4[1].conv2.weight.grad.abs().mean().item())
     
             
     print("\n\nFinal scores")
