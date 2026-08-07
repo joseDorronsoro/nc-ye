@@ -85,7 +85,7 @@ def h_pi(probs):
 
 
 
-def frozen_W(dim, probs):
+def optimal_W(dim, probs):
     """Frozen weight matrix for Y targets
     """
     V = householder_V(probs)
@@ -95,7 +95,7 @@ def frozen_W(dim, probs):
     
     U = np.eye(dim)[ : , : len(probs)]
     
-    print('\n' + 10 * '.' + ' checking frozen weight matrix')
+    print('\n' + 10 * '.' + ' checking optimal weight matrix')
     print('U.T @ U:', np.allclose(U.T @ U, np.eye(len(probs))))
     print('V @ V.T:', np.allclose(V @ V.T, np.eye(len(probs))))
     print('diag J', np.diagonal(J))
@@ -127,8 +127,9 @@ def run_experiment(
         optimizer_str=cfg.optimizer,
         lrate_factor=cfg.lrate_factor,
         weight_decay=cfg.weight_decay,
-        frozen_weights=cfg.frozen_weights,
+        #frozen_weights=cfg.frozen_weights,
         #resampling_factor=cfg.resampling_factor,
+        init_noise=cfg.init_noise,
         device=device,
     )
 
@@ -138,25 +139,42 @@ def main(epochs, train_loader, #train_loader_resampled,
         batch_size, optimizer_str, lrate_factor, 
         weight_decay,
         #resampling_factor, 
-        frozen_weights,
+        #frozen_weights,
+        init_noise,
         device):
+    """Builds model and optimizer and trains it.
+    Model weights are those after init resnet if init_noise < 0.
+    Else random normal noise is added to a theoretical optimal fc.weight with 
+    std init_noise that of the optimal fc.weight and to fc.bias solution 
+    with init_noise std.
     """
-    """
-    if cfg.frozen_weights == True:
+    if cfg.init_noise >= 0.:
         pr = probs(cfg.frac)
         
-        lhl_weights = frozen_W(512, pr).T
+        lhl_weights = optimal_W(512, pr).T
         lhl_bias = np.zeros(len(pr)) #.reshape(-1, 1)
         
-        print('w. b shapes', lhl_weights.shape, lhl_bias.shape)
+        #add random weight noise with std = init_noise * fc.weight.std()
+        rr = np.random.rand(*lhl_weights.shape) - 0.5
+        rr = rr / rr.std()
+        lhl_weights += init_noise * lhl_weights.std() * rr
+        
+        print('initial weight norm', np.linalg.norm(lhl_weights))
+        
+        #add random bias noise with std = init_noise 
+        bb = np.random.rand(*lhl_bias.shape) - 0.5
+        bb = bb / bb.std()
+        lhl_bias += init_noise * bb 
+        
+        #print('w. b shapes', lhl_weights.shape, lhl_bias.shape)
     
     else:
-        lhl_weights = None
         lhl_bias = None
-    
+        lhl_weights = None
+        
     model = build_model(num_classes=NUM_CLASSES,
                 input_channels=1,
-                frozen_weights=frozen_weights,
+                #frozen_weights=frozen_weights,
                 lhl_weights=lhl_weights,
                 lhl_bias=lhl_bias,
                 device=device)
@@ -167,7 +185,8 @@ def main(epochs, train_loader, #train_loader_resampled,
                                         lr_factor=lrate_factor,
                                         weight_decay=weight_decay,
                                         epochs=epochs,
-                                        frozen_weights=frozen_weights)
+                                        #frozen_weights=frozen_weights
+                                        )
 
     criterion = build_criterion(loss_name)
     mse_history = train_loop(model,
@@ -286,7 +305,7 @@ def dump_mse(
 if __name__ == "__main__":
 
     args = parse_args()
-
+    
     cfg = build_config(args)
 
     set_seed(cfg.seed)
@@ -424,7 +443,7 @@ if __name__ == "__main__":
                 rep,
             )
             
-        if cfg.epochs >= 350:
+        elif cfg.epochs >= 350:
             dump_mse(
                 mse_history,
                 cfg,

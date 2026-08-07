@@ -43,17 +43,76 @@ def get_learning_rate(loss_name, lrate_factor):
 
 #________ resnet18 model with frozen lhl weights, bias ________________________
 #________ new functions: build_model_frozen_lhl, build_optimizer_frozen_lhl
+#def build_model_0(num_classes=NUM_CLASSES,
+#                input_channels=1,
+#                lhl_weights=None,
+#                lhl_bias=None,
+#                frozen_weights=False,
+#                device='cpu'):
+#    """
+#    Build the modified ResNet18 backbone used in the experiments.
+#
+#    The model uses a reduced first convolution and removes the
+#    initial max-pooling layer to better suit MNIST-sized images.
+#    
+#    RETAIN JUST IN CASE!!!
+#    """
+#    model = models.resnet18(
+#        weights=None,
+#        num_classes=num_classes
+#    )
+#    #print('fc shape', model.fc.weight.shape, model.fc.bias.shape)
+#    
+#    # Freeze ONLY the final classification layer (weights and bias)
+#    if frozen_weights==True:
+#        if lhl_weights is None or lhl_bias is None:
+#            raise TypeError("weights and bias must be numpy arrays or torch tensors.")
+#        
+#        lhl_weights=torch.from_numpy(lhl_weights)
+#        lhl_bias=torch.from_numpy(lhl_bias)
+#        
+#        with torch.no_grad():
+#            model.fc.weight.copy_(lhl_weights)
+#            model.fc.bias.copy_(lhl_bias)
+#
+#        # although trainable, fc weights/bias will have a small learning rate
+#        # not efficient but keep it for the time bwing
+#        for param in model.parameters():
+#            param.requires_grad = True
+#    
+#    #model.fc.weight.requires_grad = False
+#    #model.fc.bias.requires_grad = False
+#
+#    # Papyan adjustments 
+#    model.conv1 = nn.Conv2d(
+#        input_channels,
+#        model.conv1.out_channels,
+#        kernel_size=3,
+#        stride=1,
+#        padding=1,
+#        bias=False
+#    )
+#
+#    model.maxpool = nn.Identity()
+#
+#    return model.to(device)
+
+
+
 def build_model(num_classes=NUM_CLASSES,
                 input_channels=1,
                 lhl_weights=None,
                 lhl_bias=None,
-                frozen_weights=False,
+                #frozen_weights=False,
                 device='cpu'):
     """
     Build the modified ResNet18 backbone used in the experiments.
 
     The model uses a reduced first convolution and removes the
     initial max-pooling layer to better suit MNIST-sized images.
+    
+    EXPERIMENTAL:
+        1. initialize weights as optimal and train
     """
     model = models.resnet18(
         weights=None,
@@ -61,23 +120,20 @@ def build_model(num_classes=NUM_CLASSES,
     )
     #print('fc shape', model.fc.weight.shape, model.fc.bias.shape)
     
-    # Freeze ONLY the final classification layer (weights and bias)
-    if frozen_weights==True:
-        if lhl_weights is None or lhl_bias is None:
-            raise TypeError("weights and bias must be numpy arrays or torch tensors.")
-        
+    if lhl_bias is not None and lhl_weights is not None:
         lhl_weights=torch.from_numpy(lhl_weights)
         lhl_bias=torch.from_numpy(lhl_bias)
         
         with torch.no_grad():
             model.fc.weight.copy_(lhl_weights)
             model.fc.bias.copy_(lhl_bias)
-
-        # although trainable, fc weights/bias will have a small learning rate
-        # not efficient but keep it for the time bwing
-        for param in model.parameters():
-            param.requires_grad = True
     
+    # fc weights/bias fully trainable: see what happens
+    # adapt effect with possibly adjusted learning rates
+    for param in model.parameters():
+        param.requires_grad = True
+    #changes end
+       
     #model.fc.weight.requires_grad = False
     #model.fc.bias.requires_grad = False
 
@@ -104,29 +160,35 @@ def build_optimizer(
         lr_factor=1.,
         weight_decay=WEIGHT_DECAY,
         epochs=350,
-        frozen_weights=False):
+        #frozen_weights=False
+        ):
     """
     Construct the optimizer and learning-rate scheduler.
     """
     lr = get_learning_rate(loss_name,
                            lr_factor)
-                           
-    if frozen_weights == True:
-        fc_params = set(map(id, model.fc.parameters()))
+    print('effective learning-rate', lr)
     
-        other_params = [
-            p for p in model.parameters()
-            if id(p) not in fc_params
-        ]
+    #if frozen_weights == True:
+    #    fc_params = set(map(id, model.fc.parameters()))
+    #
+    #    other_params = [
+    #        p for p in model.parameters()
+    #        if id(p) not in fc_params
+    #    ]
+    #
+    #    #first try; lr = 0. for fc params
+    #    params = [{'params': other_params, 'lr': lr}, 
+    #         {'params': model.fc.parameters(), 'lr': 1.e-3 * lr},
+    #         ]
+    #
+    #else:
+    #    #Sseems to work fine
+    #    params = [{'params': model.parameters(), 'lr': lr}, 
+    #         ]
     
-        #first try; lr = 0. for fc params
-        params = [{'params': other_params, 'lr': lr}, 
-             {'params': model.fc.parameters(), 'lr': 1.e-3 * lr},
-             ]
-    
-    else:
-        #Sseems to work fine
-        params = [{'params': model.parameters(), 'lr': lr}, 
+    # grad for all params
+    params = [{'params': model.parameters(), 'lr': lr}, 
              ]
         
     if optimizer_name == 'sgd':
@@ -143,14 +205,17 @@ def build_optimizer(
         #    gamma=LR_DECAY
         #)
         
-        
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=epochs,
-            eta_min= lr * MINIMUM_LR_FACTOR
+    elif optimizer_name == 'adamw':
+
+        optimizer = optim.AdamW(
+            # Instantiate AdamW without filtering out frozen parameters for now
+            #params = [{'params': model.parameters(), 'lr': lr_factor * LR_SGD}], 
+            params = params, #[{'params': model.parameters(), 'lr': lr}], 
+            #momentum=MOMENTUM_ADAMW,
+            weight_decay=weight_decay, #WEIGHT_DECAY_ADAMW
         )
 
-    # no optimizer other than SGD has been tested
+    # no other optimizer has been tested
     elif optimizer_name == 'adam':
 
         optimizer = optim.Adam(
@@ -159,23 +224,6 @@ def build_optimizer(
         )
 
         scheduler = None
-
-    elif optimizer_name == 'adamw':
-
-        optimizer = optim.AdamW(
-            # Instantiate AdamW without filtering out frozen parameters for now
-            params = [{'params': model.parameters(), 'lr': lr_factor * LR_ADAMW}], 
-            #momentum=MOMENTUM_ADAMW,
-            weight_decay=weight_decay, #WEIGHT_DECAY_ADAMW
-        )
-
-        #scheduler = None
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=epochs,
-            eta_min= lr * MINIMUM_LR_FACTOR
-        )
-
 
     elif optimizer_name == 'rmsp':
 
@@ -189,14 +237,18 @@ def build_optimizer(
     else:
         raise ValueError(f'Unknown optimizer: {optimizer_name}')
 
+    
+    #same cosine scheduler for all optimizers so far
+    #consider combined warmup + cosine schedulers for adamW? 
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=epochs,
+        eta_min= lr * MINIMUM_LR_FACTOR
+    )
+
     return optimizer, scheduler
     
     
-#________ adapting:
-#         train_fn: new argument frozen_lhl as a flag
-#         train_loop: new argument frozen_lhl as a flag,
-#               calls adapteed train_fn;
-#               if frozen_lhl False, training should revert to that of plain launcher.py
 def train_fn(model, criterion, device, num_classes, train_loader, optimizer, batch_size, 
         #frozen_lhl=False
     ):
@@ -326,13 +378,12 @@ def train_loop(model,
             )
 
             print(f'..... test majority acc. {maj_acc:.4f}')
-            print(f'..... test minority acc. {min_acc:.4f}',
-                  flush=True)
+            print(f'..... test minority acc. {min_acc:.4f}')
             
             print('..... checking grad norms')
-            print("\tfc.weight norm; should stay near constant when freezing weights:", model.fc.weight.norm().item())
-            print("\tLayer4 abs grad mean; should eventually decrease:", model.layer4[1].conv2.weight.grad.abs().mean().item())
-    
+            print("\tfc.weight norm; ideally, final fc weights should have a norm near 3.0, that of the optimal W solution:", model.fc.weight.norm().item())
+            print("\tLayer4 abs grad mean; should eventually decrease:", model.layer4[1].conv2.weight.grad.abs().mean().item(),
+                  flush=True)
             
     print("\n\nFinal scores")
     print(

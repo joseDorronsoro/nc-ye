@@ -47,9 +47,10 @@ class ExperimentConfig:
     save_results: bool = False
     
     weight_decay: float = 5.e-4
-    
-    frozen_weights: int = 0
+    init_noise: float = -1.
 
+    #frozen_weights: int = 0
+    
 
 def set_seed(seed: int):
     """
@@ -188,14 +189,22 @@ def parse_args():
         help="Minority class resampling ratio; default: 1.0, no resampling and use standard Torch loader",
     )
     
-    parser.add_argument(
-        "-frw",
-        "--frozen_weights",
-        type=int,
-        default=0,
-        help="Flag for frozen weigh training. Default: 0, train lhl weights and bias",
-    )
+    #parser.add_argument(
+    #    "-frw",
+    #    "--frozen_weights",
+    #    type=int,
+    #    default=0,
+    #    help="Flag for frozen weigh training. Default: 0, train lhl weights and bias",
+    #)
     
+    parser.add_argument(
+        "-in",
+        "--init_noise",
+        type=float,
+        default=-1.,
+        help="Random noise to be added to optimal fc weights at initialization. Default: -1., use resnet default fc values",
+    )
+        
     return parser.parse_args()
 
 
@@ -221,7 +230,8 @@ def build_config(args):
         encoding=args.encoding,
         save_results=bool(args.save_results),
         resampling_factor=args.resampling_factor,
-        frozen_weights=bool(args.frozen_weights)
+        #frozen_weights=bool(args.frozen_weights)
+        init_noise=args.init_noise
     )
 
 
@@ -273,7 +283,8 @@ def get_paths(cfg):
 
     results_dir = (
         f"{results_root}"
-        f"{dataset_name}_test/"
+        #f"{dataset_name}_test/"
+        f"{dataset_name}/"
         f"frac_{cfg.frac}_"
         f"{cfg.batch_size}_"
         f"{cfg.lrate_factor}/"
