@@ -12,6 +12,8 @@ from pathlib import Path
 
 from dataclasses import asdict
 
+import fisher_functions as ff
+
 from config import (
     parse_args,
     build_config,
@@ -34,6 +36,9 @@ from training import (
     model_targ_out,
     model_lhl_out_data,
     bbn_predict,
+    probs,
+    h_pi,
+    optimal_W
 )
 
 from analysis import (
@@ -49,60 +54,65 @@ from analysis import (
 LOSS_MAP = {
     "ce": "CrossEntropyLoss",
     "mse": "MSELoss",
+    "hreg_loss": "HRegLoss",
+    "anchorhreg_loss": "AnchorHRegLoss",
+    "anchor_loss": "AnchorLoss",
+    "center_loss": "CenterLoss",
+    "anchorcenter_loss": "AnchorCenterLoss"
 }
 
 NUM_CLASSES = 10
 
 # ------- frozen weight matrix ------------------------------------------------
-def probs(frac):
-    """Imbalanced probabilities
-    """
-    probs = np.array(5 * [1.] + 5 * [frac])
-    probs = probs / probs.sum()
-    
-    return probs 
-
-
-
-def householder_V(probs):
-    """Householder V matrix for the SVD of h_pi
-    """
-    v = (np.sqrt(probs) + np.array(9 * [0.] + [1.])).reshape(-1, 1)
-    V = (2. / (v.T @ v)) * (v @ v.T) - np.eye(len(probs))
-    
-    return V
-
-
-
-def h_pi(probs):
-    """H_pi matrix from probs.
-    
-    Good for checking that froW bwloNot used.
-    """
-    H_pi = np.eye(10) - np.sqrt(probs).reshape(-1, 1) @ np.sqrt(probs).reshape(-1, 1).T
-
-    return H_pi
-
-
-
-def optimal_W(dim, probs):
-    """Frozen weight matrix for Y targets
-    """
-    V = householder_V(probs)
-    
-    J = np.eye(len(probs))
-    J[-1, -1] = 0.
-    
-    U = np.eye(dim)[ : , : len(probs)]
-    
-    print('\n' + 10 * '.' + ' checking optimal weight matrix')
-    print('U.T @ U:', np.allclose(U.T @ U, np.eye(len(probs))))
-    print('V @ V.T:', np.allclose(V @ V.T, np.eye(len(probs))))
-    print('diag J', np.diagonal(J))
-    print('h_pi svd', np.allclose(V @ J @ V.T, h_pi(probs)), '\n')
-    #print(np.linalg.norm(U @ J @ V.T))
-    
-    return U @ J @ V.T
+#def probs(frac):
+#    """Imbalanced probabilities
+#    """
+#    probs = np.array(5 * [1.] + 5 * [frac])
+#    probs = probs / probs.sum()
+#    
+#    return probs 
+#
+#
+#
+#def householder_V(probs):
+#    """Householder V matrix for the SVD of h_pi
+#    """
+#    v = (np.sqrt(probs) + np.array(9 * [0.] + [1.])).reshape(-1, 1)
+#    V = (2. / (v.T @ v)) * (v @ v.T) - np.eye(len(probs))
+#    
+#    return V
+#
+#
+#
+#def h_pi(probs):
+#    """H_pi matrix from probs.
+#    
+#    Good for checking that froW bwloNot used.
+#    """
+#    H_pi = np.eye(10) - np.sqrt(probs).reshape(-1, 1) @ np.sqrt(probs).reshape(-1, 1).T
+#
+#    return H_pi
+#
+#
+#
+#def optimal_W(dim, probs):
+#    """Frozen weight matrix for Y targets
+#    """
+#    V = householder_V(probs)
+#    
+#    J = np.eye(len(probs))
+#    J[-1, -1] = 0.
+#    
+#    U = np.eye(dim)[ : , : len(probs)]
+#    
+#    print('\n' + 10 * '.' + ' checking optimal weight matrix')
+#    print('U.T @ U:', np.allclose(U.T @ U, np.eye(len(probs))))
+#    print('V @ V.T:', np.allclose(V @ V.T, np.eye(len(probs))))
+#    print('diag J', np.diagonal(J))
+#    print('h_pi svd', np.allclose(V @ J @ V.T, h_pi(probs)), '\n')
+#    #print(np.linalg.norm(U @ J @ V.T))
+#    
+#    return U @ J @ V.T
 
 
 # -----------------------------------------------------------------------------
@@ -129,44 +139,41 @@ def run_experiment(
         weight_decay=cfg.weight_decay,
         #frozen_weights=cfg.frozen_weights,
         #resampling_factor=cfg.resampling_factor,
-        init_noise=cfg.init_noise,
+        #init_noise=None, #cfg.init_noise,
         device=device,
     )
 
 
-def main(epochs, train_loader, #train_loader_resampled, 
+def main(epochs, train_loader, 
         test_loader, loss_name, encoding, 
         batch_size, optimizer_str, lrate_factor, 
         weight_decay,
-        #resampling_factor, 
-        #frozen_weights,
-        init_noise,
-        device):
+        init_noise=None,
+        device=None):
     """Builds model and optimizer and trains it.
     Model weights are those after init resnet if init_noise < 0.
     Else random normal noise is added to a theoretical optimal fc.weight with 
     std init_noise that of the optimal fc.weight and to fc.bias solution 
     with init_noise std.
     """
+    #if init_noise < 0., initial weights totally random
+    #else: random noise added to optimal weights 
     if cfg.init_noise >= 0.:
-        pr = probs(cfg.frac)
-        
-        lhl_weights = optimal_W(512, pr).T
-        lhl_bias = np.zeros(len(pr)) #.reshape(-1, 1)
+        frac = cfg.frac
+        lhl_weights = optimal_W(512, frac).T
+        lhl_bias = np.zeros(NUM_CLASSES) #.reshape(-1, 1)
         
         #add random weight noise with std = init_noise * fc.weight.std()
         rr = np.random.rand(*lhl_weights.shape) - 0.5
         rr = rr / rr.std()
-        lhl_weights += init_noise * lhl_weights.std() * rr
+        lhl_weights += cfg.init_noise * lhl_weights.std() * rr
         
         print('initial weight norm', np.linalg.norm(lhl_weights))
         
         #add random bias noise with std = init_noise 
         bb = np.random.rand(*lhl_bias.shape) - 0.5
         bb = bb / bb.std()
-        lhl_bias += init_noise * bb 
-        
-        #print('w. b shapes', lhl_weights.shape, lhl_bias.shape)
+        lhl_bias += cfg.init_noise * bb 
     
     else:
         lhl_bias = None
@@ -174,7 +181,6 @@ def main(epochs, train_loader, #train_loader_resampled,
         
     model = build_model(num_classes=NUM_CLASSES,
                 input_channels=1,
-                #frozen_weights=frozen_weights,
                 lhl_weights=lhl_weights,
                 lhl_bias=lhl_bias,
                 device=device)
@@ -185,13 +191,12 @@ def main(epochs, train_loader, #train_loader_resampled,
                                         lr_factor=lrate_factor,
                                         weight_decay=weight_decay,
                                         epochs=epochs,
-                                        #frozen_weights=frozen_weights
+                                        warmup_epochs=cfg.warmup_epochs
                                         )
 
-    criterion = build_criterion(loss_name)
+    criterion = build_criterion(loss_name, cfg, model)
     mse_history = train_loop(model,
                train_loader,
-               #train_loader_resampled,
                test_loader,
                criterion,
                optimizer,
@@ -202,7 +207,8 @@ def main(epochs, train_loader, #train_loader_resampled,
                train_fn,
                model_targ_out,
                bbn_predict,
-               ye_classifier_targ)
+               cfg)
+               #ye_classifier_targ)
 
     train_results = model_lhl_out_data(model, train_loader, device, layer='avgpool')
     test_results = model_lhl_out_data(model, test_loader, device, layer='avgpool')
@@ -235,7 +241,10 @@ def save_experiment_results(
         f"{cfg.batch_size}_"
         f"{cfg.lrate_factor}_"
         f"{cfg.weight_decay}_"
+        f"{cfg.hreg_decay}_"
         f"{cfg.epochs}_"
+        f"{cfg.lambda_anchor}_"
+        f"{cfg.warmup_epochs}_"
         f"{rep_number}_"
     )
 
@@ -260,12 +269,15 @@ def save_experiment_results(
     )
 
     # Save experiment configuration
-
-    joblib.dump(
-        asdict(cfg),
-        results_dir + prefix +
-        "config.joblib",
-    )
+    #joblib.dump(
+    #    asdict(cfg),
+    #    results_dir + prefix +
+    #    "config.joblib",
+    #)
+    
+    with open(results_dir + prefix + "config.txt", "w") as f:
+        for key, value in asdict(cfg).items():
+            f.write(f"{key}: {value}\n")
 
 
 def dump_mse(
@@ -307,8 +319,22 @@ if __name__ == "__main__":
     args = parse_args()
     
     cfg = build_config(args)
+    cfg.init_noise = float(cfg.init_noise)
+    
+    if (cfg.hreg_decay < 0. or cfg.weight_decay < 0. or
+        cfg.lrate_factor < 0. or cfg.lambda_anchor < 0. or
+        cfg.lambda_center < 0.):
+            raise argparse.ArgumentTypeError(
+                "Some of hreg_decay, weight_decay, lrate_factor, \
+                 lambda_anchor or lambda_center is negative"
+            )
 
     set_seed(cfg.seed)
+    
+    # adjust weight_decay with batch_size to take into accoun reduction=sum
+    # in mse and lhl regularization 
+    #cfg.weight_decay = cfg.batch_size * cfg.weight_decay
+    print(cfg.weight_decay, cfg.batch_size)
     
     print("\nExperiment configuration:")
     print(cfg, flush=True)
@@ -425,15 +451,36 @@ if __name__ == "__main__":
         H_pi = h_pi(pr)
         w_final = w_b_lhl[0]
         #print('weight_diff_norm', np.linalg.norm(w_final @ w_final.T - H_pi)**2.) 
+        
+        #final diff vs h_pi
         wdn = np.linalg.norm(w_final @ w_final.T - H_pi)
-        print(f'..... final weight_diff_norm. {wdn:.4f}')
+        print(f'..... final ||w.T @ w - H_pi|| {wdn:.4f}')
+        
+        
+        #final class centers diff vs h_pi
+        label = np.argmax(targs_out, axis=1)
+        ccm  = ff.ccm_array(lhl_out,  label)
+        q = ccm @ np.diag(np.sqrt(pr)) 
+        qdn = np.linalg.norm(q.T @ q - H_pi)
+        print(f'..... final ||q.T @ q - H_pi|| {qdn:.4f}', flush=True)        
         
         # -------------------------
         # Save results
         # -------------------------
 
-        if cfg.save_results:
-
+        if cfg.reps == 1:
+            #save locally always 1 repetition
+            save_experiment_results(
+                train_results,
+                test_results,
+                mse_history,
+                cfg,
+                results_dir='./exps/',
+                rep_number=0,
+            )
+        
+        elif cfg.save_results:
+            #save all runs results
             save_experiment_results(
                 train_results,
                 test_results,
@@ -443,13 +490,13 @@ if __name__ == "__main__":
                 rep,
             )
             
-        elif cfg.epochs >= 350:
-            dump_mse(
-                mse_history,
-                cfg,
-                results_dir='./exps/',
-                rep_number=0,
-            )
+        #elif cfg.epochs >= 50:
+        #    dump_mse(
+        #        mse_history,
+        #        cfg,
+        #        results_dir='./exps/',
+        #        rep_number=0,
+        #    )
 
     t2 = dt.datetime.now(dt.UTC)
 

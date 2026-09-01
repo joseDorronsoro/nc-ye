@@ -17,6 +17,13 @@ import textwrap
 import numpy as np
 import torch
 
+WARMUP_EPOCHS = 20
+
+LAMBDA_ANCHOR = 1.e-2
+LAMBDA_CENTER = 1.e-2
+LAMBDA_HREG = 5.e-4
+
+
 @dataclass
 class ExperimentConfig:
     """
@@ -47,7 +54,16 @@ class ExperimentConfig:
     save_results: bool = False
     
     weight_decay: float = 5.e-4
+    hreg_decay: float = 5.e-4
+    
     init_noise: float = -1.
+    
+    lambda_anchor: float = LAMBDA_ANCHOR
+    lambda_center: float = LAMBDA_CENTER
+    lambda_hreg: float = LAMBDA_HREG
+    
+    
+    warmup_epochs: int = WARMUP_EPOCHS
 
     #frozen_weights: int = 0
     
@@ -122,6 +138,7 @@ def parse_args():
     parser.add_argument(
         "-ops",
         "--optimizer_string",
+        choices=["sgd", "adamw"],
         default="sgd",
         help="default: sgd",
     )
@@ -129,9 +146,9 @@ def parse_args():
     parser.add_argument(
         "-l",
         "--loss",
-        choices=["ce", "mse"],
+        choices=["ce", "mse", "anchor_loss", "center_loss", "anchorcenter_loss", "hreg_loss", "anchorhreg_loss"],
         default="mse",
-        help="default: mse",
+        help="default: mse; other losses: ce, anchor_loss, center_loss, anchorcenter_loss, hreg_loss, anchorhreg_loss"
     )
 
     parser.add_argument(
@@ -156,6 +173,30 @@ def parse_args():
         type=float,
         default=5.e-4,
         help="default: 5.e-4, ok for sgd on mnist; for adamw try higher values",
+    )
+
+    parser.add_argument(
+        "-hrd",
+        "--hreg_decay",
+        type=float,
+        default=5.e-4,
+        help="default: 5.e-4, same as weight_decay, but must be revised",
+    )
+
+    parser.add_argument(
+        "-la",
+        "--lambda_anchor",
+        type=float,
+        default=1.e-2,
+        help="weight of the Anchor loss; default: 1.e-2",
+    )
+
+    parser.add_argument(
+        "-lc",
+        "--lambda_center",
+        type=float,
+        default=1.e-2,
+        help="weight of the Center loss; default: 1.e-2",
     )
 
     parser.add_argument(
@@ -200,7 +241,7 @@ def parse_args():
     parser.add_argument(
         "-in",
         "--init_noise",
-        type=float,
+        type=str,
         default=-1.,
         help="Random noise to be added to optimal fc weights at initialization. Default: -1., use resnet default fc values",
     )
@@ -227,6 +268,9 @@ def build_config(args):
         frac=args.frac,
         lrate_factor=args.lrate_factor,
         weight_decay=args.weight_decay,
+        hreg_decay=args.hreg_decay,
+        lambda_anchor=args.lambda_anchor,
+        lambda_center=args.lambda_center,
         encoding=args.encoding,
         save_results=bool(args.save_results),
         resampling_factor=args.resampling_factor,
@@ -286,8 +330,9 @@ def get_paths(cfg):
         #f"{dataset_name}_test/"
         f"{dataset_name}/"
         f"frac_{cfg.frac}_"
-        f"{cfg.batch_size}_"
-        f"{cfg.lrate_factor}/"
+        f"bs_{cfg.batch_size}_"
+        f"lrf_{cfg.lrate_factor}/"
+        #f"la_{cfg.lambda_anchor}/"
     )
 
     Path(results_dir).mkdir(
