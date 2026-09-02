@@ -12,7 +12,6 @@ from sklearn.metrics import mean_squared_error
 import fisher_functions as ff
 
 from analysis import (
-    #majority_minority_accuracy,
     evaluate_model,
 )
 
@@ -33,12 +32,6 @@ LR_DECAY = 0.1
 
 #cosine_scheduler
 MINIMUM_LR_FACTOR = 1.e-2
-
-#warmup scheduler
-#WARMUP_EPOCHS = 20
-
-#LAMBDA_ANCHOR = 1.e-2
-
 
 # ------- frozen weight matrix ------------------------------------------------
 def probs(frac):
@@ -119,64 +112,6 @@ def get_learning_rate(loss_name, lrate_factor):
     return LR_SGD * lrate_factor
 
 
-#________ resnet18 model with frozen lhl weights, bias ________________________
-#________ new functions: build_model_frozen_lhl, build_optimizer_frozen_lhl
-#def build_model_0(num_classes=NUM_CLASSES,
-#                input_channels=1,
-#                lhl_weights=None,
-#                lhl_bias=None,
-#                frozen_weights=False,
-#                device='cpu'):
-#    """
-#    Build the modified ResNet18 backbone used in the experiments.
-#
-#    The model uses a reduced first convolution and removes the
-#    initial max-pooling layer to better suit MNIST-sized images.
-#    
-#    RETAIN JUST IN CASE!!!
-#    """
-#    model = models.resnet18(
-#        weights=None,
-#        num_classes=num_classes
-#    )
-#    #print('fc shape', model.fc.weight.shape, model.fc.bias.shape)
-#    
-#    # Freeze ONLY the final classification layer (weights and bias)
-#    if frozen_weights==True:
-#        if lhl_weights is None or lhl_bias is None:
-#            raise TypeError("weights and bias must be numpy arrays or torch tensors.")
-#        
-#        lhl_weights=torch.from_numpy(lhl_weights)
-#        lhl_bias=torch.from_numpy(lhl_bias)
-#        
-#        with torch.no_grad():
-#            model.fc.weight.copy_(lhl_weights)
-#            model.fc.bias.copy_(lhl_bias)
-#
-#        # although trainable, fc weights/bias will have a small learning rate
-#        # not efficient but keep it for the time bwing
-#        for param in model.parameters():
-#            param.requires_grad = True
-#    
-#    #model.fc.weight.requires_grad = False
-#    #model.fc.bias.requires_grad = False
-#
-#    # Papyan adjustments 
-#    model.conv1 = nn.Conv2d(
-#        input_channels,
-#        model.conv1.out_channels,
-#        kernel_size=3,
-#        stride=1,
-#        padding=1,
-#        bias=False
-#    )
-#
-#    model.maxpool = nn.Identity()
-#
-#    return model.to(device)
-
-
-
 def build_model(num_classes=NUM_CLASSES,
                 input_channels=1,
                 lhl_weights=None,
@@ -210,7 +145,7 @@ def build_model(num_classes=NUM_CLASSES,
     for param in model.parameters():
         param.requires_grad = True
        
-    #for later???
+    #for later: do not compute weigh and bias grads
     #model.fc.weight.requires_grad = False
     #model.fc.bias.requires_grad = False
 
@@ -238,7 +173,6 @@ def build_optimizer(
         weight_decay=WEIGHT_DECAY,
         epochs=350,
         warmup_epochs=0
-        #frozen_weights=False
         ):
     """
     Construct the optimizer and learning-rate scheduler.
@@ -246,24 +180,6 @@ def build_optimizer(
     lr = get_learning_rate(loss_name,
                            lr_factor)
     print('effective learning-rate', lr)
-    
-    #if frozen_weights == True:
-    #    fc_params = set(map(id, model.fc.parameters()))
-    #
-    #    other_params = [
-    #        p for p in model.parameters()
-    #        if id(p) not in fc_params
-    #    ]
-    #
-    #    #first try; lr = 0. for fc params
-    #    params = [{'params': other_params, 'lr': lr}, 
-    #         {'params': model.fc.parameters(), 'lr': 1.e-3 * lr},
-    #         ]
-    #
-    #else:
-    #    #Sseems to work fine
-    #    params = [{'params': model.parameters(), 'lr': lr}, 
-    #         ]
     
     # grad for all params
     params = [{'params': model.parameters(), 'lr': lr}, 
@@ -277,20 +193,12 @@ def build_optimizer(
             weight_decay=weight_decay,
         )
 
-        #scheduler = optim.lr_scheduler.MultiStepLR(
-        #    optimizer,
-        #    milestones=LR_MILESTONES,
-        #    gamma=LR_DECAY
-        #)
-        
     elif optimizer_name == 'adamw':
 
         optimizer = optim.AdamW(
             # Instantiate AdamW without filtering out frozen parameters for now
-            #params = [{'params': model.parameters(), 'lr': lr_factor * LR_SGD}], 
             params = params, #[{'params': model.parameters(), 'lr': lr}], 
-            #momentum=MOMENTUM_ADAMW,
-            weight_decay=weight_decay, #WEIGHT_DECAY_ADAMW
+            weight_decay=weight_decay, 
         )
 
     # no other optimizer has been tested
@@ -316,14 +224,6 @@ def build_optimizer(
         raise ValueError(f'Unknown optimizer: {optimizer_name}')
 
     
-    #same cosine scheduler for all optimizers so far
-    #consider combined warmup + cosine schedulers for adamW? 
-    #scheduler = optim.lr_scheduler.CosineAnnealingLR(
-    #    optimizer,
-    #    T_max=epochs,
-    #    eta_min= lr * MINIMUM_LR_FACTOR
-    #)
-
     warmup_epochs = min(warmup_epochs, epochs // 3)
     print('effective warmup_epochs', warmup_epochs)
 
@@ -367,7 +267,6 @@ def build_optimizer(
     
     
 def train_fn(model, criterion, device, num_classes, train_loader, optimizer, batch_size, 
-        #frozen_lhl=False
     ):
     """
     Train the model for one epoch using a single pass through
@@ -389,10 +288,9 @@ def train_fn(model, criterion, device, num_classes, train_loader, optimizer, bat
         
         out = model(data)
         
-        #print('str(criterion)', str(criterion))
-        
         if str(criterion) == 'CrossEntropyLoss()':
             loss = criterion(out, target)
+        
         elif str(criterion) == 'MSELoss()' or 'AnchorLoss' in str(criterion):
             if len(target.shape) == 1:
                 loss = criterion(out, F.one_hot(target, num_classes=num_classes).float())
@@ -400,46 +298,23 @@ def train_fn(model, criterion, device, num_classes, train_loader, optimizer, bat
                 loss = criterion(out, target.float())
             else:
                 sys.exit('something wrong in train ...')
+        
         elif 'CenterLoss' in str(criterion):
             loss = criterion(data, target)
+        
         elif 'HRegLoss' in str(criterion):
             loss = criterion(data, target)
-        
-        #print(f"Center Loss Dtype:  {loss.dtype}")       
-        #print(f"Model Weight Dtype: {model.fc.weight.dtype}")
-        
-        # --- RUN THIS RIGHT BEFORE total_loss.backward() ---
-
-        # 1. Check if any model parameter is Double
-        #double_params = [name for name, p in model.named_parameters() if p.dtype == torch.float64]
-        #print("Double Parameters:", double_params)
-        #
-        ## 2. Check if any model buffer (e.g., BatchNorm running_mean/var) is Double
-        #double_buffers = [name for name, b in model.named_buffers() if b.dtype == torch.float64]
-        #print("Double Buffers:", double_buffers)
-        #
-        ## 4. Check hook tensor
-        #print("Captured h Dtype:", criterion.current_h.dtype if criterion.current_h is not None else "None")
-        
         
         loss.backward()
         
         optimizer.step()
 
-        # not clear why do I want this
-        #if len(target.shape) == 1:
-        #    accuracy = torch.mean((torch.argmax(out,dim=1)==target).float()).item()
-        #elif len(target.shape) == 2 and target.shape[1] == num_classes:
-        #    target_class = torch.argmax(target,dim=1)
-        #    accuracy = torch.mean((torch.argmax(out,dim=1)==target_class).float()).item()
-        
     return 
 
 
 
 def train_loop(model,
                train_loader,
-               #train_loader_resampled,
                test_loader,
                criterion,
                optimizer,
@@ -451,8 +326,6 @@ def train_loop(model,
                model_targ_out,
                bbn_predict,
                cfg
-               #ye_classifier,
-               #frozen_lhl=False
                ):
     """
     Execute the complete training procedure.
@@ -463,7 +336,9 @@ def train_loop(model,
     minority class accuracies.
     """
     mse_history = []
+
     #print("Is memory address identical?", id(criterion.layer.weight) == id(model.fc.weight))
+
     # Will raise an AssertionError if they point to different memory addresses
     if 'AnchorLoss' in str(criterion):
         assert id(criterion.layer.weight) == id(model.fc.weight), \
@@ -476,11 +351,6 @@ def train_loop(model,
     W_target = torch.Tensor(optimal_W(dim, cfg.frac, verbose=False).T)
     
     for epoch in range(0, epochs + 1):
-        
-        #if epoch == 0:
-        #    #should be 0 if inn = 0.
-        #    print("\tfc.weight norm; initial fc weights should have a norm = 3.0, that of the optimal W solution:", model.fc.weight.norm().item())
-
         train_fn(
             model,
             criterion,
@@ -488,15 +358,12 @@ def train_loop(model,
             NUM_CLASSES,
             train_loader,
             optimizer,
-            #epoch,
             train_loader.batch_size,
-            #frozen_lhl=frozen_lhl
         )
 
         if scheduler is not None:
             scheduler.step()
 
-        #also uses resampling loader: actual mse    
         targets, outputs = model_targ_out(
             model,
             train_loader,
@@ -516,7 +383,6 @@ def train_loop(model,
                 f'mse={mse:.6f}'
             )
 
-            #uses plain loader    
             maj_acc, min_acc = evaluate_model(
                 model,
                 train_loader,
@@ -536,15 +402,11 @@ def train_loop(model,
             with torch.no_grad():
                 # Calculate distance from target matrix
                 weight_drift = torch.norm(model.fc.weight - W_target.to('cuda'), p='fro').item()
-                
-                # Calculate magnitude of the total gradient on fc.weight
-                #grad_norm = torch.norm(model.fc.weight.grad, p='fro').item()
                 b_norm = torch.norm(model.fc.bias, p='fro').item()
                 
                 #print(f"\tDistance ||W_fc - W||: {weight_drift:.4f} \t b_norm: {b_norm:.4f} \t Total fc.weight Grad Norm: {grad_norm:.4f}")
                 
                 train_results = model_lhl_out_data(model, train_loader, device, layer='avgpool')
-                
                 (
                     targs_out,
                     model_out,
@@ -591,20 +453,11 @@ class HRegLoss(nn.Module):
     """
     def __init__(self, model: nn.Module, 
                  fc_layer_name: str = 'fc', 
-                 #frac: float = 0.005, 
-                 #dim: int = 512, 
                  hreg_decay: float = 5.e-4,
                  reduction: str = 'mean'):
         super().__init__()
         self.model = model
-        #self.layer = model.fc_layer_name
         self.layer = getattr(model, fc_layer_name)
-        
-        #self.frac = frac 
-        
-        #W_target = torch.Tensor(optimal_W(dim, frac, verbose=False)).detach()
-        #self.W_target = W_target.to('cuda', dtype=torch.float).T
-        #self.dim = dim
         
         self.hreg_decay = hreg_decay
         if self.hreg_decay > 0.:
@@ -646,6 +499,7 @@ class HRegLoss(nn.Module):
             # Average squared L2 norm per sample in the batch
             #hreg_loss = torch.mean(torch.sum(h ** 2, dim=1))
             hreg_loss = torch.sum(h ** 2) / h.shape[0]
+
             # Clear cached features after computing loss
             self.current_h = None
             
@@ -662,7 +516,6 @@ class AnchorLoss(nn.Module):
     plus an L2 distance penalty anchoring a weight tensor to a fixed target matrix W.
     """
     def __init__(self, 
-                 #layer, #W_target: torch.Tensor,
                  model: nn.Module,
                  fc_layer_name: str = 'fc', 
                  frac: float = 0.005, 
@@ -683,7 +536,6 @@ class AnchorLoss(nn.Module):
             
         self.mse_loss_fn = nn.MSELoss(reduction=reduction)
         
-        #self.dim = dim
         W_target = torch.Tensor(optimal_W(dim, frac, verbose=False)).detach()
         self.W_target = W_target.T
         
@@ -739,7 +591,6 @@ class AnchorHRegLoss(nn.Module):
         self.frac = frac 
         
         # W_target
-        #self.dim = dim
         W_target = torch.Tensor(optimal_W(dim, frac, verbose=False)).detach()
         self.W_target = W_target.to('cuda', dtype=torch.float).T
         
@@ -756,7 +607,6 @@ class AnchorHRegLoss(nn.Module):
         self.layer.register_forward_hook(self._hook_fn)
         
         self.lambda_anchor = lambda_anchor
-        #print(20 * '.' + 'using lambda_anchor:', lambda_anchor)
         
         if self.hreg_decay > 0. and self.lambda_anchor > 0.:
             #full AnchorHRegLoss
@@ -789,7 +639,7 @@ class AnchorHRegLoss(nn.Module):
         outputs = self.model(inputs).to(dtype=torch.float)
         targets = targets.to(dtype=torch.float)
         
-        mse = self.mse_loss_fn(outputs, targets)#.to(dtype=torch.float)
+        mse = self.mse_loss_fn(outputs, targets)
  
         #hreg penalty
         if self.current_h is None:
@@ -804,7 +654,7 @@ class AnchorHRegLoss(nn.Module):
         self.current_h = None
         
         #anchor penalty
-        anchor_penalty = torch.sum((self.layer.weight - self.W_target) ** 2.) #+ torch.sum(self.layer.bias ** 2.) * self.layer.weight.shape[1] / 10
+        anchor_penalty = torch.sum((self.layer.weight - self.W_target) ** 2.)
         
         if self.hreg_decay > 0. and self.lambda_anchor > 0.:
             #full AnchorHRegLoss
@@ -842,7 +692,6 @@ class CenterLoss(nn.Module):
         
         self.frac = frac 
         
-        #self.dim = dim
         W_target = torch.Tensor(optimal_W(dim, frac, verbose=False)).detach()
         self.W_target = W_target.to('cuda', dtype=torch.float).T
         
@@ -879,47 +728,6 @@ class CenterLoss(nn.Module):
         # Intercept input tensor entering fc layer
         self.current_h = input[0]
 
-
-    #def forward0(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-    #    """
-    #    Args:
-    #        inputs (torch.Tensor): Input batch 'x' (matches standard criterion interface)
-    #        targets (torch.Tensor): Class labels 'y' [batch_size]
-    #    """
-    #    outputs = self.model(inputs).to(dtype=torch.float)
-    #    targets = targets.to(dtype=torch.float)
-    #    mse = self.mse_loss_fn(outputs, targets).to(dtype=torch.float)
-    #
-    #    if self.lambda_center > 0.:
-    #        if self.current_h is None:
-    #            raise RuntimeError("You must execute `model(inputs)` before calling CenterLoss.forward().")
-    #            
-    #        h = self.current_h.to(dtype=torch.float)
-    #        
-    #        # --- DIAGNOSTIC PRINTS ---
-    #        #print(f"DEBUG inside CenterLoss:")
-    #        #print(f"  h dtype:         {h.dtype if h is not None else 'NONE'}")
-    #        #print(f"  fc.weight dtype: {self.fc_layer.weight.dtype}")
-    #        #print(f"  targets dtype:   {targets.dtype}")
-    #        #print(f"  lambda dtype:    {type(self.lambda_center)}")
-    #        ## -------------------------
-    #        
-    #        pr = probs(self.frac)
-    #        centers = self.W_target.T @ torch.Tensor(np.diag(1. / np.sqrt(pr))).to('cuda', dtype=torch.float)
-    #        
-    #        local_labels = np.argmax(targets.cpu().numpy(), axis = 1)
-    #        centers = centers[local_labels].to(dtype=torch.float)  # [batch_size, hidden_dim]
-    #        
-    #        #centers = centers @ torch.Tensor(np.diag(1. / np.sqrt(pr))).to('cuda', dtype=torch.float)
-    #        center_loss = torch.mean(torch.sum((h - centers) ** 2, dim=1)).to(dtype=torch.float)
-    #        
-    #        # Clear cached features after computing loss
-    #        self.current_h = None
-    #    
-    #        return mse + self.lambda_center * center_loss
-    #    
-    #    else:
-    #        return mse
 
     def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """
@@ -993,7 +801,6 @@ class AnchorCenterLoss(nn.Module):
                  reduction: str = 'mean'):
         super().__init__()
         self.model = model
-        #self.layer = model.fc_layer_name
         self.layer = getattr(model, fc_layer_name)
         
         self.frac = frac 
@@ -1049,7 +856,7 @@ class AnchorCenterLoss(nn.Module):
         """
         outputs = self.model(inputs).to(dtype=torch.float)
         targets = targets.to(dtype=torch.float)
-        mse = self.mse_loss_fn(outputs, targets)#.to(dtype=torch.float)
+        mse = self.mse_loss_fn(outputs, targets)
  
         if self.lambda_anchor > 0.:
             anchor_penalty = torch.sum((self.layer.weight - self.W_target.to('cuda')) ** 2.) + torch.sum(self.layer.bias ** 2.) * self.layer.weight.shape[1] / 10
@@ -1119,7 +926,6 @@ def build_criterion(loss_name, cfg, model):
         
     elif loss_name == 'HRegLoss':
         return HRegLoss(model,
-                #frac=cfg.frac, 
                 fc_layer_name='fc', 
                 hreg_decay=cfg.hreg_decay)
 
@@ -1179,7 +985,6 @@ def bbn_predict(model, loader, device):
     return model_out, targ_out
 
 
-
 def model_targ_out(model, loader, device):
     """
     Return targets and model outputs for all samples in a DataLoader.
@@ -1225,11 +1030,8 @@ def model_lhl_out_data(model, loader, device, layer='avgpool'):
     layer_names = [n for n, _ in model.named_children()]
     
     for ly in layer_names:
-        #print("model." + ly + ".register_forward_hook(get_activation('" + ly + "'))")
         exec("model." + ly + ".register_forward_hook(get_activation('" + ly + "', activation))")
         
-    #print(layer_names, activation.keys())
-    
     l_targs = []
     l_out = []
     l_h = []
@@ -1255,96 +1057,3 @@ def model_lhl_out_data(model, loader, device, layer='avgpool'):
     return targs_out, model_out, \
            layer_out.reshape((layer_out.shape[0], layer_out.shape[1])), \
            (w_lhl, b_lhl)
-
-
-# ------------------------------------------------------------------------------ old stuff, remove eventually
-#def build_model_00(num_classes=NUM_CLASSES,
-#                input_channels=1,
-#                lhl_weights=None,
-#                lhl_bias=None,
-#                device='cpu'):
-#    """
-#    Build the modified ResNet18 backbone used in the experiments.
-#
-#    The model uses a reduced first convolution and removes the
-#    initial max-pooling layer to better suit MNIST-sized images.
-#    """
-#    model = models.resnet18(
-#        weights=None,
-#        num_classes=num_classes
-#    )
-#
-#    model.conv1 = nn.Conv2d(
-#        input_channels,
-#        model.conv1.out_channels,
-#        kernel_size=3,
-#        stride=1,
-#        padding=1,
-#        bias=False
-#    )
-#
-#    model.maxpool = nn.Identity()
-#
-#    return model.to(device)
-#
-#
-#
-#def build_optimizer_00(
-#        model,
-#        loss_name='MSELoss',
-#        optimizer_name='sgd',
-#        lr_factor=1.):
-#    """
-#    Construct the optimizer and learning-rate scheduler.
-#    """
-#    lr = get_learning_rate(loss_name,
-#                      lr_factor)
-#
-#    if optimizer_name == 'sgd':
-#
-#        optimizer = optim.SGD(
-#            model.parameters(),
-#            lr=lr,
-#            momentum=MOMENTUM,
-#            weight_decay=WEIGHT_DECAY
-#        )
-#
-#        scheduler = optim.lr_scheduler.MultiStepLR(
-#            optimizer,
-#            milestones=LR_MILESTONES,
-#            gamma=LR_DECAY
-#        )
-#
-#    elif optimizer_name == 'adam':
-#
-#        optimizer = optim.Adam(
-#            model.parameters(),
-#            weight_decay=WEIGHT_DECAY
-#        )
-#
-#        scheduler = None
-#
-#    elif optimizer_name == 'adamw':
-#
-#        optimizer = optim.AdamW(
-#            model.parameters(),
-#            weight_decay=WEIGHT_DECAY
-#        )
-#
-#        scheduler = None
-#
-#    elif optimizer_name == 'rmsp':
-#
-#        optimizer = optim.RMSprop(
-#            model.parameters(),
-#            weight_decay=WEIGHT_DECAY
-#        )
-#
-#        scheduler = None
-#
-#    else:
-#        raise ValueError(f'Unknown optimizer: {optimizer_name}')
-#
-#    return optimizer, scheduler
-
-

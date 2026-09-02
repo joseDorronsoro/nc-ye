@@ -219,21 +219,17 @@ def nc_analysis(x_lhl, w_b_lhl, y, y_pred, verbose=False):
         
         #NC2: cosines of centered class means closs to simplex matrix
         C = len(np.unique(y))
-        print('norm of ccm cos matrix - simplex matrix', np.linalg.norm(ff.cos_matrix(ccm) - ff.m_simplex(C)) / C / (C-1))
+        print('NC2: ||cos(ccm) - simplex_m|| / C / (C-1)', np.linalg.norm(ff.cos_matrix(ccm) - ff.m_simplex(C)) / C / (C-1))
         
         #NC2: cosines of lhl weights close to simplex matrix
-        print('norm of lhl weights cos matrix - simplex matrix', np.linalg.norm(ff.cos_matrix(w_lhl.T) - ff.m_simplex(C)) / C / (C-1))
+        print('NC2: ||cos(w^*) - simplex_m|| / C / (C-1)', np.linalg.norm(ff.cos_matrix(w_lhl.T) - ff.m_simplex(C)) / C / (C-1))
         
         #NC3: approx self duality between centered means and lhl weights
         print(10*'.' + ' NCC3')
         norm_ccm = ccm / np.linalg.norm(ccm)
         norm_w_lhl = w_lhl.T / np.linalg.norm(w_lhl.T)
         
-        #previous version
-        #Papyan plots' version
-        #print('duality of ccmeans and lhl weights', np.linalg.norm(norm_ccm - norm_w_lhl) / C / (C-1))
-        
-        print('duality of ccmeans and lhl weights', np.linalg.norm(norm_ccm - norm_w_lhl) **2.)
+        print('NC3: ||ccm - w||**2', np.linalg.norm(norm_ccm - norm_w_lhl) **2.)
         
     #NCC4: equivalence of resnet preds with those of nearest class centers
     y_ncc_pred = np.zeros(x_lhl.shape[0])

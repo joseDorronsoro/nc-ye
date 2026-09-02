@@ -115,7 +115,6 @@ def loader_from_numpy00(x, y, x_ts, y_ts, batch_size=128, train_shuffle=True):
 
 
 def loader_from_numpy(x, y, x_ts, y_ts, batch_size=128, 
-        #train_shuffle=False,
         resampling_factor=1.
     ):
     """
@@ -329,49 +328,6 @@ def imbalanced_subsampling(
     return x_train, yy_train, x_test, yy_test
 
 
-def load_dataset00(cfg, data_dir):
-    """
-    Load the experimental dataset and prepare it for training.
-
-    The function performs imbalanced subsampling, target encoding
-    (OHE or Ye) and DataLoader construction according to the
-    experiment configuration.
-    """
-
-    full_class_size = (
-        6000
-        if "fashion_mnist" in cfg.bunch_file
-        else 5000
-    )
-
-    bunch = joblib.load(
-        data_dir + cfg.bunch_file
-    )
-
-    x_tr, y_tr, x_ts, y_ts = (
-        imbalanced_subsampling(
-            bunch=bunch,
-            full_class_size=full_class_size,
-            full_class_labels=[0, 1, 2, 3, 4],
-            frac=cfg.frac,
-            target_encoding=cfg.encoding,
-        )
-    )
-
-    train_loader, test_loader = (
-        loader_from_numpy(
-            x_tr,
-            y_tr,
-            x_ts,
-            y_ts,
-            batch_size=cfg.batch_size,
-            train_shuffle=True,
-        )
-    )
-
-    return train_loader, test_loader
-
-
 def load_dataset(cfg, data_dir):
     """
     Load the experimental dataset and prepare it for training.
@@ -408,7 +364,6 @@ def load_dataset(cfg, data_dir):
             x_ts,
             y_ts,
             batch_size=cfg.batch_size,
-            #train_shuffle=True,
             resampling_factor=cfg.resampling_factor
         )
     )

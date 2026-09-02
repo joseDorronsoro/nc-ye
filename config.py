@@ -65,8 +65,6 @@ class ExperimentConfig:
     
     warmup_epochs: int = WARMUP_EPOCHS
 
-    #frozen_weights: int = 0
-    
 
 def set_seed(seed: int):
     """
@@ -230,14 +228,6 @@ def parse_args():
         help="Minority class resampling ratio; default: 1.0, no resampling and use standard Torch loader",
     )
     
-    #parser.add_argument(
-    #    "-frw",
-    #    "--frozen_weights",
-    #    type=int,
-    #    default=0,
-    #    help="Flag for frozen weigh training. Default: 0, train lhl weights and bias",
-    #)
-    
     parser.add_argument(
         "-in",
         "--init_noise",
@@ -340,9 +330,19 @@ def get_paths(cfg):
         exist_ok=True,
     )
 
-    print("results_dir:", results_dir)
+    exp_1_dir = (
+        f"../nc-ye_exps/"
+    )
+    
+    Path(exp_1_dir).mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    return data_dir, results_dir
+    print("results_dir:", results_dir,
+          "exp_1_dir", exp_1_dir)
+
+    return data_dir, results_dir, exp_1_dir
 
 
 # ==========================================================

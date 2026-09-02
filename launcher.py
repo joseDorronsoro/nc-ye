@@ -24,7 +24,6 @@ from config import (
 
 from data import (
     load_dataset,
-    #load_dataset_with_resampler
 )
 
 from training import (
@@ -63,73 +62,18 @@ LOSS_MAP = {
 
 NUM_CLASSES = 10
 
-# ------- frozen weight matrix ------------------------------------------------
-#def probs(frac):
-#    """Imbalanced probabilities
-#    """
-#    probs = np.array(5 * [1.] + 5 * [frac])
-#    probs = probs / probs.sum()
-#    
-#    return probs 
-#
-#
-#
-#def householder_V(probs):
-#    """Householder V matrix for the SVD of h_pi
-#    """
-#    v = (np.sqrt(probs) + np.array(9 * [0.] + [1.])).reshape(-1, 1)
-#    V = (2. / (v.T @ v)) * (v @ v.T) - np.eye(len(probs))
-#    
-#    return V
-#
-#
-#
-#def h_pi(probs):
-#    """H_pi matrix from probs.
-#    
-#    Good for checking that froW bwloNot used.
-#    """
-#    H_pi = np.eye(10) - np.sqrt(probs).reshape(-1, 1) @ np.sqrt(probs).reshape(-1, 1).T
-#
-#    return H_pi
-#
-#
-#
-#def optimal_W(dim, probs):
-#    """Frozen weight matrix for Y targets
-#    """
-#    V = householder_V(probs)
-#    
-#    J = np.eye(len(probs))
-#    J[-1, -1] = 0.
-#    
-#    U = np.eye(dim)[ : , : len(probs)]
-#    
-#    print('\n' + 10 * '.' + ' checking optimal weight matrix')
-#    print('U.T @ U:', np.allclose(U.T @ U, np.eye(len(probs))))
-#    print('V @ V.T:', np.allclose(V @ V.T, np.eye(len(probs))))
-#    print('diag J', np.diagonal(J))
-#    print('h_pi svd', np.allclose(V @ J @ V.T, h_pi(probs)), '\n')
-#    #print(np.linalg.norm(U @ J @ V.T))
-#    
-#    return U @ J @ V.T
-
-
 # -----------------------------------------------------------------------------
 
 def run_experiment(
     cfg,
     train_loader,
-    #train_loader_resampled,
     test_loader,
     device,
-):
-    #print(cfg)
+    ):
     
     return main(
         epochs=cfg.epochs,
         train_loader=train_loader,
-        #train_loader_resampled=train_loader_resampled,
         test_loader=test_loader,
         loss_name=LOSS_MAP[cfg.loss],
         encoding=cfg.encoding,
@@ -137,9 +81,6 @@ def run_experiment(
         optimizer_str=cfg.optimizer,
         lrate_factor=cfg.lrate_factor,
         weight_decay=cfg.weight_decay,
-        #frozen_weights=cfg.frozen_weights,
-        #resampling_factor=cfg.resampling_factor,
-        #init_noise=None, #cfg.init_noise,
         device=device,
     )
 
@@ -268,13 +209,6 @@ def save_experiment_results(
         "l_mse.joblib",
     )
 
-    # Save experiment configuration
-    #joblib.dump(
-    #    asdict(cfg),
-    #    results_dir + prefix +
-    #    "config.joblib",
-    #)
-    
     with open(results_dir + prefix + "config.txt", "w") as f:
         for key, value in asdict(cfg).items():
             f.write(f"{key}: {value}\n")
@@ -288,7 +222,6 @@ def dump_mse(
 ):
 
     prefix = (
-        #f"{bf_name}_"
         f"{cfg.encoding}_"
         f"{cfg.frac}_"
         f"{cfg.optimizer}_"
@@ -306,9 +239,6 @@ def dump_mse(
         results_dir + prefix + "l_mse.joblib",
     )
 
-    # Save experiment configuration
-
-    
     
 # ==========================================================
 # Main script
@@ -331,27 +261,17 @@ if __name__ == "__main__":
 
     set_seed(cfg.seed)
     
-    # adjust weight_decay with batch_size to take into accoun reduction=sum
-    # in mse and lhl regularization 
-    #cfg.weight_decay = cfg.batch_size * cfg.weight_decay
-    print(cfg.weight_decay, cfg.batch_size)
-    
     print("\nExperiment configuration:")
     print(cfg, flush=True)
 
-    data_dir, results_dir = get_paths(cfg)
+    #data_dir, results_dir = get_paths(cfg)
+    data_dir, results_dir, exp_1_dir = get_paths(cfg)
 
     train_loader, test_loader = load_dataset(
-    #train_loader, _ = load_dataset(
         cfg,
         data_dir,
     )
     
-    #train_loader_resampled, test_loader = load_dataset_with_resampler(
-    #    cfg,
-    #    data_dir,
-    #)
-
     device = get_device(cfg)
 
     t1 = dt.datetime.now(dt.UTC)
@@ -380,7 +300,6 @@ if __name__ == "__main__":
         ) = run_experiment(
             cfg,
             train_loader,
-            #train_loader_resampled,
             test_loader,
             device,
         )
@@ -440,7 +359,6 @@ if __name__ == "__main__":
             model_out_ts,
             cfg.frac,
             cfg.encoding,
-            #ye_classifier_targ
         )
         
         print(f'..... final test majority acc. {maj_acc_test:.4f}')
@@ -450,7 +368,6 @@ if __name__ == "__main__":
         pr = probs(cfg.frac)
         H_pi = h_pi(pr)
         w_final = w_b_lhl[0]
-        #print('weight_diff_norm', np.linalg.norm(w_final @ w_final.T - H_pi)**2.) 
         
         #final diff vs h_pi
         wdn = np.linalg.norm(w_final @ w_final.T - H_pi)
@@ -475,7 +392,7 @@ if __name__ == "__main__":
                 test_results,
                 mse_history,
                 cfg,
-                results_dir='./exps/',
+                exp_1_dir,
                 rep_number=0,
             )
         
@@ -490,14 +407,6 @@ if __name__ == "__main__":
                 rep,
             )
             
-        #elif cfg.epochs >= 50:
-        #    dump_mse(
-        #        mse_history,
-        #        cfg,
-        #        results_dir='./exps/',
-        #        rep_number=0,
-        #    )
-
     t2 = dt.datetime.now(dt.UTC)
 
     print(
