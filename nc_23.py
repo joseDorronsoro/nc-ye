@@ -7,7 +7,7 @@ import fisher_functions as ff
 
 # -------- parameters ---------------------------------------------------------
 #params
-fr = 0.1
+fr = 0.01
 
 opt = 'adamw'
 opt = 'sgd'
@@ -17,12 +17,16 @@ if opt == 'sgd':
 elif opt == 'adamw':
     lrf = 0.01
 
-bs = 128
+bs = 192
 wd = 0.0005
-hrd = 5e-20
-epochs = 1
-l_anc = 0.01
+hrd = 0.0005
+epochs = 600
 warm_epochs = 20
+l_anc = 0.01
+l_center = 1e-06
+
+#bunch_mnist_ef_ye_0.01_opbslrwd_sgd_192_1.0_0.0005_epwu_600_20_hrlalc_0.0005_0.01_1e-06_0_train_results
+
 
 #bunch_mnist_ye_0.1_sgd_128_1.0_0.0005_1_0.01_20_0_train_results
 
@@ -139,16 +143,29 @@ def subspace_min_cosine(A: np.ndarray, B: np.ndarray, tol: float = 1e-5) -> floa
 
 #print params
 print('\n' + 10 * '.' + 'params')
-print('opt:', opt, '\tfrac:', fr, 
-      '\tlr_fac:', lrf, '\tlambda_anch:', l_anc,
-      '\tepochs:', epochs)
+#print('opt:', opt, '\tfrac:', fr, 
+#      '\tlr_fac:', lrf, '\tlambda_anch:', l_anc,
+#      '\tepochs:', epochs)
+
+print(
+'bs = ', bs,
+'\twd = ', wd, 
+'\thrd = ', hrd,
+'\tepochs = ', epochs, 
+'\twarm_epochs = ', warm_epochs, 
+'\tl_anc = ', l_anc,
+'\tl_center = ', l_center
+)
+
+
 
 #results_dir = '/mnt/e/ongoing/nn_collapse/torch/results/lr_1.0/mnist_test_frac_' + str(fr) + '/'
-results_dir = './exps/'
-#bunch_mnist_ye_0.1_sgd_128_1.0_0.0005_5e-20_1_0.01_20_0_test_results
-file_str = ('bunch_mnist_ye_' + str(fr) + '_' + opt + '_'  + str(bs) + '_' + 
-            str(lrf) + '_' + str(wd) + '_' + str(hrd) + '_' + str(epochs) + '_' + 
-            str(l_anc) + '_' + str(warm_epochs) + '_0')
+results_dir = '../nc-ye_exps/'
+#bunch_mnist_ef_ye_0.01_opbslrwd_sgd_192_1.0_0.0005_epwu_600_20_hrlalc_0.0005_0.01_1e-06_0_train_results
+file_str = ('bunch_mnist_ef_ye_' + str(fr) + 
+            '_opbslrwd_sgd_' + str(bs) + '_' +  str(lrf) + '_' + str(wd) + 
+            '_epwu_' + str(epochs) + '_' + str(warm_epochs) +
+            '_hrlalc_' + str(hrd) + '_' + str(l_anc) + '_' + str(l_center) + '_0')
 
 targs_out, model_out, ll, w_b_lhl = joblib.load(results_dir + file_str + '_train_results.joblib')
 
@@ -181,18 +198,18 @@ w_theo_w_pred = w_opt.T @ w + + b.reshape(-1, 1) @ pr.reshape(1, -1)
 w_theo_q_pred = w_opt.T @ q + + b.reshape(-1, 1) @ pr.reshape(1, -1)
 
 print('\n' + 10 * '.' + 'train, w,  ccm mse')
-print(f'train_w_loss; {np.linalg.norm(w_pred_train - targs_out) ** 2. / ll.shape[0]: .4f}')
-print(f'train_q_loss; {np.linalg.norm(q_pred_train - targs_out) ** 2. / ll.shape[0]: .4f}')
+print(f'mean ||w_pred_train - targs_out||**2.: {np.linalg.norm(w_pred_train - targs_out) ** 2. / ll.shape[0]: .4f}')
+print(f'mean ||q_pred_train - targs_out||**2.:; {np.linalg.norm(q_pred_train - targs_out) ** 2. / ll.shape[0]: .4f}')
 
-print(f'\nreduced_w_w_loss: {np.linalg.norm(w_w_pred - H_pi) ** 2.: .4f}',  
-      f'\nreduced_w_q_loss: {np.linalg.norm(w_q_pred - H_pi) ** 2.: .4f}',
-      f'\nreduced_q_q_loss: {np.linalg.norm(q_q_pred - H_pi) ** 2.: .4f}') 
+print(f'\n||w_opt.T @ w_pred - H_pi||**2.: {np.linalg.norm(w_w_pred - H_pi) ** 2.: .4f}',  
+      f'\n||w_opt.T @ q_pred - H_pi||**2.:  {np.linalg.norm(w_q_pred - H_pi) ** 2.: .4f}',
+      f'\n||q.T @ q - H_pi||**2.: : {np.linalg.norm(q_q_pred - H_pi) ** 2.: .4f}') 
 
-print(f'\nreduced_w_theo_w_theo_loss: {np.linalg.norm(w_theo_w_theo_pred - H_pi) ** 2.: .4f}', 
-      f'\nreduced_w_theo_w_loss: {np.linalg.norm(w_theo_w_pred - H_pi) ** 2.: .4f}', 
-      f'\nreduced_w_theo_q_loss: {np.linalg.norm(w_theo_q_pred - H_pi) ** 2.: .4f}')
+print(f'\n||w_opt.T @ w_opt - H_pi||**2.: {np.linalg.norm(w_theo_w_theo_pred - H_pi) ** 2.: .4f}', 
+      f'\n||w_opt.T @ w - H_pi||**2.: {np.linalg.norm(w_theo_w_pred - H_pi) ** 2.: .4f}', 
+      f'\n||w_opt.T @ q - H_pi||**2. {np.linalg.norm(w_theo_q_pred - H_pi) ** 2.: .4f}')
       
-print(np.abs(w.T @ w - w.T @ q).max())
+#print(np.abs(w.T @ w - w.T @ q).max())
 
 #Final w, b norms
 print('\n' + 10 * '.' + 'q, w, q-w, q-w_theo, w-w_theo, b norms')
@@ -207,7 +224,7 @@ print('\n' + 10 * '.' + f'q @ w_opt mean: {np.abs(q.T.dot(w_opt)).mean(): .4f} s
 
 #Final anchored loss
 print('\n' + 10 * '.' + 'final anchor loss')
-print(f'anchor loss: {np.linalg.norm(w - w_opt) ** 2. / w_opt.shape[0] + np.linalg.norm(b) ** 2.: .4f}')
+print(f'||w - w_opt.T||**2. / w.shape[0] + ||b||**2.: {np.linalg.norm(w - w_opt) ** 2. / w_opt.shape[0] + np.linalg.norm(b) ** 2.: .4f}')
 
 
 #Theoretical cos, norm values
@@ -224,7 +241,7 @@ print('\n' + 10 * '.' + ' traces')
 s_with = ff.s_within(ll, label) / ll.shape[0]
 s_betw = ff.s_between(ll, label) / ll.shape[0]
 nc1_tr = np.trace(np.linalg.pinv(s_betw, rcond=1.e-5) @ s_with) / n_classes
-print(f'trace: {nc1_tr: .6f}')
+print(f'trace (s_B^+ s_W) / C: {nc1_tr: .6f}')
 
 
 #NC2 norms
@@ -233,9 +250,9 @@ nw = np.linalg.norm(w, axis=0)
 nh = np.linalg.norm(ccm, axis=0)
 nq = np.linalg.norm(q, axis=0)
 
-print(f'  norm_diff_w_w_theo: max {np.abs(nw - theo_w_norms).max(): 8.4f} \tmean {np.abs(nw - theo_w_norms).mean(): 8.4f}')
-print(f'norm_diff_ccm_w_theo: max {np.abs(nh - theo_ccm_norms).max(): 8.4f} \tmean {np.abs(nh - theo_ccm_norms).mean(): 8.4f}')
-print(f'  norm_diff_q_w_theo: max {np.abs(nq - theo_w_norms).max(): 8.4f} \tmean {np.abs(nq - theo_w_norms).mean(): 8.4f}')
+print(f'    ||w|| - ||w_teo||: max {np.abs(nw - theo_w_norms).max(): 8.4f} \tmean {np.abs(nw - theo_w_norms).mean(): 8.4f}')
+print(f'||ccm|| - ||ccm_teo||: max {np.abs(nh - theo_ccm_norms).max(): 8.4f} \tmean {np.abs(nh - theo_ccm_norms).mean(): 8.4f}')
+print(f'    ||q|| - ||q_teo||: max {np.abs(nq - theo_w_norms).max(): 8.4f} \tmean {np.abs(nq - theo_w_norms).mean(): 8.4f}')
 
 #print('relative norm_diff_w', np.abs((nw - theo_w_norms) / theo_w_norms).max(), np.abs((nw - theo_w_norms) / theo_w_norms).mean())
 #print('relative norm_diff_ccm', np.abs(nh - theo_ccm_norms).max(), np.abs(nh - theo_ccm_norms).mean())

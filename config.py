@@ -19,9 +19,11 @@ import torch
 
 WARMUP_EPOCHS = 20
 
-LAMBDA_ANCHOR = 1.e-2
-LAMBDA_CENTER = 1.e-2
-LAMBDA_HREG = 5.e-4
+WEIGHT_DECAY = 5.e-4
+HREG_DECAY = 0.
+
+LAMBDA_ANCHOR = 0.
+LAMBDA_CENTER = 0.
 
 
 @dataclass
@@ -43,6 +45,7 @@ class ExperimentConfig:
 
     optimizer: str = "sgd"
     loss: str = "mse"
+    resnet_model: str = '18'
 
     frac: float = 0.1
     lrate_factor: float = 1.0
@@ -53,15 +56,13 @@ class ExperimentConfig:
     
     save_results: bool = False
     
-    weight_decay: float = 5.e-4
-    hreg_decay: float = 5.e-4
+    weight_decay: float = WEIGHT_DECAY
+    hreg_decay: float = HREG_DECAY
     
-    init_noise: float = -1.
+    init_noise: float = -1. 
     
     lambda_anchor: float = LAMBDA_ANCHOR
     lambda_center: float = LAMBDA_CENTER
-    lambda_hreg: float = LAMBDA_HREG
-    
     
     warmup_epochs: int = WARMUP_EPOCHS
 
@@ -150,6 +151,15 @@ def parse_args():
     )
 
     parser.add_argument(
+        "-rnm",
+        "--resnet_model",
+        type=str,
+        choices=["18", "34", "50"],
+        default="18",
+        help="Pytorch resnet model to use; default: 18, use resnet18"
+    )
+
+    parser.add_argument(
         "-fr",
         "--frac",
         type=float,
@@ -170,31 +180,31 @@ def parse_args():
         "--weight_decay",
         type=float,
         default=5.e-4,
-        help="default: 5.e-4, ok for sgd on mnist; for adamw try higher values",
+        help="default: 5.e-4, ok for sgd on mnist; for adamw try higher values using lrate_factor",
     )
 
     parser.add_argument(
         "-hrd",
         "--hreg_decay",
         type=float,
-        default=5.e-4,
-        help="default: 5.e-4, same as weight_decay, but must be revised",
+        default=HREG_DECAY,
+        help="default: 0.0; hreg decay doesn't apply",
     )
 
     parser.add_argument(
         "-la",
         "--lambda_anchor",
         type=float,
-        default=1.e-2,
-        help="weight of the Anchor loss; default: 1.e-2",
+        default=LAMBDA_ANCHOR,
+        help="weight of the Anchor penalty; default: 0.,  the penalty doesn't apply",
     )
 
     parser.add_argument(
         "-lc",
         "--lambda_center",
         type=float,
-        default=1.e-2,
-        help="weight of the Center loss; default: 1.e-2",
+        default=LAMBDA_CENTER,
+        help="weight of the Center penalty; default: 0., the penalty doesn't apply",
     )
 
     parser.add_argument(
@@ -225,7 +235,9 @@ def parse_args():
         "--resampling_factor",
         type=float,
         default=1.0,
-        help="Minority class resampling ratio; default: 1.0, no resampling and use standard Torch loader",
+        help=("Minority class resampling ratio; default: 1.0, no resampling and use standard Torch loader."
+              "Doesn't seem to help getting good test accuracies."
+              "Best not to use it"),
     )
     
     parser.add_argument(
@@ -255,6 +267,7 @@ def build_config(args):
         gpu=args.gpu,
         optimizer=args.optimizer_string,
         loss=args.loss,
+        resnet_model=args.resnet_model,
         frac=args.frac,
         lrate_factor=args.lrate_factor,
         weight_decay=args.weight_decay,

@@ -120,7 +120,8 @@ def main(epochs, train_loader,
         lhl_bias = None
         lhl_weights = None
         
-    model = build_model(num_classes=NUM_CLASSES,
+    model = build_model(resnet_model=cfg.resnet_model,
+                num_classes=NUM_CLASSES,
                 input_channels=1,
                 lhl_weights=lhl_weights,
                 lhl_bias=lhl_bias,
@@ -176,16 +177,18 @@ def save_experiment_results(
 
     prefix = (
         f"{bf_name}_"
-        f"{cfg.encoding}_"
+        f"efm_{cfg.encoding}_"
         f"{cfg.frac}_"
-        f"{cfg.optimizer}_"
+        f"{cfg.resnet_model}_"
+        f"opbslrwd_{cfg.optimizer}_"
         f"{cfg.batch_size}_"
         f"{cfg.lrate_factor}_"
         f"{cfg.weight_decay}_"
-        f"{cfg.hreg_decay}_"
-        f"{cfg.epochs}_"
-        f"{cfg.lambda_anchor}_"
+        f"epwu_{cfg.epochs}_"
         f"{cfg.warmup_epochs}_"
+        f"hrlalc_{cfg.hreg_decay}_"
+        f"{cfg.lambda_anchor}_"
+        f"{cfg.lambda_center}_"
         f"{rep_number}_"
     )
 

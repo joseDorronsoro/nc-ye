@@ -112,10 +112,13 @@ def get_learning_rate(loss_name, lrate_factor):
     return LR_SGD * lrate_factor
 
 
-def build_model(num_classes=NUM_CLASSES,
+def build_model(resnet_model='18',
+                num_classes=NUM_CLASSES,
                 input_channels=1,
                 lhl_weights=None,
                 lhl_bias=None,
+                #lhl_dim=512,
+                enlarge_lhl=False,
                 device='cpu'):
     """
     Build the modified ResNet18 backbone used in the experiments.
@@ -126,10 +129,28 @@ def build_model(num_classes=NUM_CLASSES,
     EXPERIMENTAL:
         1. initialize weights as optimal and train
     """
-    model = models.resnet18(
-        weights=None,
-        num_classes=num_classes
-    )
+    if resnet_model == '18':
+        model = models.resnet18(
+            weights=None,
+            num_classes=num_classes
+        )
+    elif resnet_model == '34':
+        model = models.resnet34(
+            weights=None,
+            num_classes=num_classes
+        )
+    elif resnet_model == '50':
+        model = models.resnet50(
+            weights=None,
+            num_classes=num_classes
+        )
+    else:
+        raise ValueError(
+            f"Invalid model '{resnet_model}'. Expected one of 18, 34 or 50."
+        )
+    
+    print(5*'.' + f" Using resnet model {resnet_model}.")
+    lhl_dim = model.fc.in_features
     
     if lhl_bias is not None and lhl_weights is not None:
         #print('initializing weights................................................................')
@@ -160,6 +181,15 @@ def build_model(num_classes=NUM_CLASSES,
     )
 
     model.maxpool = nn.Identity()
+    
+    # Replace model.fc: perhaps artificial, as the "true" lhl dime is 512 
+    if enlarge_lhl == True:
+        model.fc = nn.Sequential(
+            nn.Linear(512, lhl_dim),
+            nn.BatchNorm1d(lhl_dim),
+            nn.ReLU(),
+            nn.Linear(lhl_dim, num_classes)
+        )
 
     return model.to(device)
 
@@ -395,16 +425,15 @@ def train_loop(model,
             print(f'..... test majority acc. {maj_acc:.4f}')
             print(f'..... test minority acc. {min_acc:.4f}')
             
-            print('..... checking grad norms')
-            print("\tfc.weight norm; ideally, final fc weights should have a norm near 3.0, that of the optimal W solution:", model.fc.weight.norm().item())
-            print("\tLayer4 abs grad mean; should eventually decrease:", model.layer4[1].conv2.weight.grad.abs().mean().item(), flush=True)
+            #print('..... checking grad norms')
+            #print("\tfc.weight norm; ideally, final fc weights should have a norm near 3.0, that of the optimal W solution:", model.fc.weight.norm().item())
+            #print("\tLayer4 abs grad mean; should eventually decrease:", model.layer4[1].conv2.weight.grad.abs().mean().item(), flush=True)
                   
             with torch.no_grad():
                 # Calculate distance from target matrix
                 weight_drift = torch.norm(model.fc.weight - W_target.to('cuda'), p='fro').item()
                 b_norm = torch.norm(model.fc.bias, p='fro').item()
-                
-                #print(f"\tDistance ||W_fc - W||: {weight_drift:.4f} \t b_norm: {b_norm:.4f} \t Total fc.weight Grad Norm: {grad_norm:.4f}")
+                print(f"........... ||W_fc - W||: {weight_drift:.4f} \t ||b||: {b_norm:.4f}") 
                 
                 train_results = model_lhl_out_data(model, train_loader, device, layer='avgpool')
                 (
@@ -419,7 +448,7 @@ def train_loop(model,
                 ccm  = ff.ccm_array(lhl_out,  label)
                 q = ccm @ np.diag(np.sqrt(pr)) 
                 qdn = np.linalg.norm(q.T @ q - H_pi)
-                print(f'..... q.T @ q - H_pi diff {qdn:.4f}', flush=True)
+                print(f'..... ||q.T @ q - H_pi||: {qdn:.4f}', flush=True)
     
     print("\n\nFinal scores")
     print(
@@ -859,6 +888,7 @@ class AnchorCenterLoss(nn.Module):
         mse = self.mse_loss_fn(outputs, targets)
  
         if self.lambda_anchor > 0.:
+            #remove bias penalty??
             anchor_penalty = torch.sum((self.layer.weight - self.W_target.to('cuda')) ** 2.) + torch.sum(self.layer.bias ** 2.) * self.layer.weight.shape[1] / 10
         
         if self.lambda_center > 0.:
@@ -873,7 +903,7 @@ class AnchorCenterLoss(nn.Module):
             total_loss = 0.0
             valid_classes = 0
             
-            min_samples_threshold = 1  # Ignore centers calculated from < 3 samples
+            min_samples_threshold = 1  # Ignore centers calculated from < 1 samples
             
             for c, count in zip(unique_classes, counts):
                 if count < min_samples_threshold:
