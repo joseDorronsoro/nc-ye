@@ -149,7 +149,7 @@ def build_model(resnet_model='18',
             f"Invalid model '{resnet_model}'. Expected one of 18, 34 or 50."
         )
     
-    print(5*'.' + f" Using resnet model {resnet_model}.")
+    #print(5*'.' + f" Using resnet model {resnet_model}.")
     lhl_dim = model.fc.in_features
     
     if lhl_bias is not None and lhl_weights is not None:
@@ -168,7 +168,7 @@ def build_model(resnet_model='18',
        
     #for later: do not compute weigh and bias grads
     #model.fc.weight.requires_grad = False
-    #model.fc.bias.requires_grad = False
+    model.fc.bias.requires_grad = False
 
     # Papyan adjustments 
     model.conv1 = nn.Conv2d(
@@ -209,7 +209,7 @@ def build_optimizer(
     """
     lr = get_learning_rate(loss_name,
                            lr_factor)
-    print('effective learning-rate', lr)
+    #print('effective learning-rate', lr)
     
     # grad for all params
     params = [{'params': model.parameters(), 'lr': lr}, 
@@ -255,13 +255,13 @@ def build_optimizer(
 
     
     warmup_epochs = min(warmup_epochs, epochs // 3)
-    print('effective warmup_epochs', warmup_epochs)
+    #print('effective warmup_epochs', warmup_epochs)
 
     if warmup_epochs > 0:
-        print(' using warmup scheduling with ', warmup_epochs, 
-            'epochs plus cosine scheduler with ', epochs - warmup_epochs, 'epochs', 
-            flush=True
-        )
+        #print('using warmup scheduling with ', warmup_epochs, 
+        #    'epochs plus cosine scheduler with ', epochs - warmup_epochs, 'epochs', 
+        #    flush=True
+        #)
         
         warmup_scheduler = optim.lr_scheduler.LinearLR(
             optimizer,
@@ -286,7 +286,7 @@ def build_optimizer(
         )
     
     else:
-        print(5*'.' + ' using cosine scheduling with no warmup')
+        #print(5*'.' + ' using cosine scheduling with no warmup')
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
             T_max = epochs,  
@@ -743,14 +743,6 @@ class CenterLoss(nn.Module):
         
         pr = probs(self.frac)
         self.centers = self.W_target.T @ torch.Tensor(np.diag(1. / np.sqrt(pr))).to('cuda', dtype=torch.float)
-        
-        if self.lambda_center > 0.:
-            #full CenterLoss
-            print('\n' + 5 * '.' + ' using CenterLoss')
-        
-        else:
-            #plain mse
-            print('\n' + 5 * '.' + ' using plain MSE')
                 
 
     def _hook_fn(self, module, input, output):
@@ -781,7 +773,7 @@ class CenterLoss(nn.Module):
             total_loss = 0.0
             valid_classes = 0
             
-            min_samples_threshold = 1  # Ignore centers calculated from < 3 samples
+            min_samples_threshold = 3  # Ignore centers calculated from < 3 samples
             
             for c, count in zip(unique_classes, counts):
                 if count < min_samples_threshold:

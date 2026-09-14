@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 import joblib
+import torch
 
 import datetime as dt
 from pathlib import Path
@@ -61,6 +62,7 @@ LOSS_MAP = {
 }
 
 NUM_CLASSES = 10
+LR_SGD = 0.0184     #as used in Papyan; about 1.e-2
 
 # -----------------------------------------------------------------------------
 
@@ -109,7 +111,7 @@ def main(epochs, train_loader,
         rr = rr / rr.std()
         lhl_weights += cfg.init_noise * lhl_weights.std() * rr
         
-        print('initial weight norm', np.linalg.norm(lhl_weights))
+        print(5 * '.' + ' initial weight norm', np.linalg.norm(lhl_weights))
         
         #add random bias noise with std = init_noise 
         bb = np.random.rand(*lhl_bias.shape) - 0.5
@@ -267,7 +269,29 @@ if __name__ == "__main__":
     print("\nExperiment configuration:")
     print(cfg, flush=True)
 
-    #data_dir, results_dir = get_paths(cfg)
+
+    print('\n' + 5 * '.' + f" Using resnet model {cfg.resnet_model}")
+    print(5 * '.' + f" Using {cfg.loss}")
+    if torch.cuda.is_available():
+        print(5 * '.' + f" Using GPU: {cfg.gpu}")
+    else:
+        print(5 * '.' + f" Using cpu")
+        
+    print(5 * '.' + f" Effective learning rate: {LR_SGD * cfg.lrate_factor}")
+    
+    effective_warmup_epochs = min(cfg.warmup_epochs, cfg.epochs // 3)
+    print(5 * '.' + f" Using warmup scheduling with {effective_warmup_epochs} " +
+            f"epochs plus cosine scheduler with {cfg.epochs - effective_warmup_epochs} epochs", 
+            flush=True
+        )
+    #if init_noise < 0., initial weights totally random
+    #else: random noise added to optimal weights 
+    if cfg.init_noise >= 0.:
+        print(5 * '.' + f" Noise with variance {cfg.init_noise} added to optimal weights")
+    else:
+        print(5 * '.' + f" Random initial fc weights")
+    
+    
     data_dir, results_dir, exp_1_dir = get_paths(cfg)
 
     train_loader, test_loader = load_dataset(

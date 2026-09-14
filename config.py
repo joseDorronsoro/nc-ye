@@ -374,11 +374,11 @@ def get_device(cfg):
             f"cuda:{cfg.gpu}"
         )
 
-        print("Using GPU:", device)
+        #print("Using GPU:", device)
 
         return device
 
-    print("Using CPU")
+    #print("Using CPU")
 
     return torch.device("cpu")
 
