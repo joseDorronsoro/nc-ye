@@ -122,7 +122,7 @@ def main(epochs, train_loader,
         lhl_bias = None
         lhl_weights = None
         
-    model = build_model(resnet_model=cfg.resnet_model,
+    model = build_model(cfg, 
                 num_classes=NUM_CLASSES,
                 input_channels=1,
                 lhl_weights=lhl_weights,

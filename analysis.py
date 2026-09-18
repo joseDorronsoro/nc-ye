@@ -114,6 +114,7 @@ def evaluate_model(
         device
     )
 
+    #funny way of computing class probs? Better to use prob function?
     _, counts = np.unique(
         train_targets,
         return_counts=True,
@@ -125,6 +126,7 @@ def evaluate_model(
     class_prob = np.sort(
         counts / counts.sum()
     )[::-1]
+    
     #print('intermediate class_prob', class_prob)
     
     return majority_minority_accuracy(

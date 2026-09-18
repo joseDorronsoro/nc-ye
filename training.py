@@ -112,7 +112,7 @@ def get_learning_rate(loss_name, lrate_factor):
     return LR_SGD * lrate_factor
 
 
-def build_model(resnet_model='18',
+def build_model(cfg,
                 num_classes=NUM_CLASSES,
                 input_channels=1,
                 lhl_weights=None,
@@ -129,6 +129,7 @@ def build_model(resnet_model='18',
     EXPERIMENTAL:
         1. initialize weights as optimal and train
     """
+    resnet_model = cfg.resnet_model
     if resnet_model == '18':
         model = models.resnet18(
             weights=None,
@@ -168,7 +169,8 @@ def build_model(resnet_model='18',
        
     #for later: do not compute weigh and bias grads
     #model.fc.weight.requires_grad = False
-    model.fc.bias.requires_grad = False
+    if cfg.loss in ["anchor_loss", "anchorcenter_loss", "anchorhreg_loss"]:
+        model.fc.bias.requires_grad = False
 
     # Papyan adjustments 
     model.conv1 = nn.Conv2d(
@@ -677,7 +679,8 @@ class AnchorHRegLoss(nn.Module):
         h = self.current_h.to(dtype=torch.float)
         
         #mean of the squared norms of the batch's elements
-        hreg_loss = torch.mean(torch.sum(h ** 2, dim=1)).to(dtype=torch.float) / h.shape[0] 
+        #hreg_loss = torch.mean(torch.sum(h ** 2, dim=1)).to(dtype=torch.float) / h.shape[0] 
+        hreg_loss = torch.sum(h ** 2) / h.shape[0]
         
         # Clear cached features after computing loss
         self.current_h = None
