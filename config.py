@@ -17,7 +17,7 @@ import textwrap
 import numpy as np
 import torch
 
-WARMUP_EPOCHS = 20
+WARMUP_EPOCHS = 0
 
 WEIGHT_DECAY = 5.e-4
 HREG_DECAY = 0.
@@ -216,6 +216,14 @@ def parse_args():
     )
 
     parser.add_argument(
+        "-wu",
+        "--warmup_epochs",
+        type=int,
+        default=0,
+        help="numbre of warmup epochs; default: 0",
+    )
+    
+    parser.add_argument(
         "-sv",
         "--save_results",
         type=int,
@@ -274,6 +282,7 @@ def build_config(args):
         hreg_decay=args.hreg_decay,
         lambda_anchor=args.lambda_anchor,
         lambda_center=args.lambda_center,
+        warmup_epochs=args.warmup_epochs,
         encoding=args.encoding,
         save_results=bool(args.save_results),
         resampling_factor=args.resampling_factor,
@@ -308,7 +317,7 @@ def get_paths(cfg):
             "nn_collapse/results/"
         )
 
-    else:
+    elif 'hoya' in host_name or 'casarrubuelos' in host_name:
 
         data_dir = (
             "/home/proyectos/ada2/"
@@ -322,6 +331,9 @@ def get_paths(cfg):
             "nn_collapse/"
         )
 
+    else:
+        sys.exit('unknown host')
+        
     dataset_name = (
         "fashion_mnist"
         if "fashion_mnist" in cfg.bunch_file
@@ -343,8 +355,9 @@ def get_paths(cfg):
         exist_ok=True,
     )
 
+    #folder to save results when only one rep 
     exp_1_dir = (
-        f"../nc-ye_exps/"
+        f"/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/"
     )
     
     Path(exp_1_dir).mkdir(
@@ -353,7 +366,7 @@ def get_paths(cfg):
     )
 
     print("results_dir:", results_dir,
-          "exp_1_dir", exp_1_dir)
+          "\n  exp_1_dir:", exp_1_dir)
 
     return data_dir, results_dir, exp_1_dir
 

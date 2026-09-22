@@ -433,7 +433,8 @@ def train_loop(model,
                   
             with torch.no_grad():
                 # Calculate distance from target matrix
-                weight_drift = torch.norm(model.fc.weight - W_target.to('cuda'), p='fro').item()
+                dev = model.fc.weight.device
+                weight_drift = torch.norm(model.fc.weight - W_target.to(device=dev), p='fro').item()
                 b_norm = torch.norm(model.fc.bias, p='fro').item()
                 print(f"........... ||W_fc - W||: {weight_drift:.4f} \t ||b||: {b_norm:.4f}") 
                 

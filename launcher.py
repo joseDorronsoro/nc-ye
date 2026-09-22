@@ -4,6 +4,8 @@
 import sys
 import os
 
+sys.path.insert(0, os.getcwd())
+
 import numpy as np
 import joblib
 import torch
@@ -12,7 +14,6 @@ import datetime as dt
 from pathlib import Path
 
 from dataclasses import asdict
-
 import fisher_functions as ff
 
 from config import (
@@ -83,6 +84,7 @@ def run_experiment(
         optimizer_str=cfg.optimizer,
         lrate_factor=cfg.lrate_factor,
         weight_decay=cfg.weight_decay,
+        warmup_epochs=cfg.warmup_epochs,
         device=device,
     )
 
@@ -92,6 +94,7 @@ def main(epochs, train_loader,
         batch_size, optimizer_str, lrate_factor, 
         weight_decay,
         init_noise=None,
+        warmup_epochs=0,
         device=None):
     """Builds model and optimizer and trains it.
     Model weights are those after init resnet if init_noise < 0.
@@ -135,7 +138,7 @@ def main(epochs, train_loader,
                                         lr_factor=lrate_factor,
                                         weight_decay=weight_decay,
                                         epochs=epochs,
-                                        warmup_epochs=cfg.warmup_epochs
+                                        warmup_epochs=warmup_epochs
                                         )
 
     criterion = build_criterion(loss_name, cfg, model)
@@ -291,7 +294,6 @@ if __name__ == "__main__":
     else:
         print(5 * '.' + f" Random initial fc weights")
     
-    
     data_dir, results_dir, exp_1_dir = get_paths(cfg)
 
     train_loader, test_loader = load_dataset(
@@ -411,9 +413,9 @@ if __name__ == "__main__":
         # -------------------------
         # Save results
         # -------------------------
-
-        if cfg.reps == 1:
-            #save locally always 1 repetition
+        if rep == 0:
+            #save locally always 1/first repetition to get a first idea
+            # even when not saving results
             save_experiment_results(
                 train_results,
                 test_results,

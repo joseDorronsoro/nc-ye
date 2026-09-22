@@ -8,6 +8,8 @@ import joblib
 
 from sklearn.metrics import accuracy_score
 
+from analysis import evaluate_maj_min_preds
+
 #import fisher_functions as ff
 
 # -------- CLI Arguments & Parameters ------------------------------------------
@@ -26,7 +28,7 @@ parser.add_argument("--epochs", type=int, default=350, help="Total epochs (defau
 parser.add_argument("--warm_epochs", type=int, default=20, help="Warmup epochs (default: 20)")
 parser.add_argument("--l_anc", type=float, default=0., help="Anchor loss weight lambda_anc (default: 0.)")
 parser.add_argument("--l_center", type=float, default=0., help="Center loss weight lambda_center (default: 0.)")
-parser.add_argument("--results_dir", type=str, default="../nc-ye_exps/", help="Directory containing joblib files (default: ../nc-ye_exps/)")
+parser.add_argument("--results_dir", type=str, default="/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/", help="Directory containing joblib files (default: /home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/)")
 
 args = parser.parse_args()
 
@@ -340,8 +342,6 @@ print(
     '\tl_center = ', l_center
 )
 
-print(rnm)
-
 # results path construction
 # bunch_mnist_efm_ye_0.01_18_opbslrwd_sgd_192_1.0_0.0005_epwu_350_20_hrlalc_0.0_0.0_1e-06_0_train_results
 file_str = (
@@ -395,6 +395,10 @@ print(f'    ||w|| - ||w||_teo: max {np.abs(n_w - n_theo).max(): 8.4f} \tmean {np
 print(f'    ||q|| - ||w||_teo: max {np.abs(n_q - n_theo).max(): 8.4f} \tmean {np.abs(n_q - n_theo).mean(): 8.4f}')
 print(f'  ||pq|| - ||w||_teo: max {np.abs(n_pq - n_theo).max(): 8.4f} \tmean {np.abs(n_pq - n_theo).mean(): 8.4f}')
 print(f'  ||pw|| - ||w||_teo: max {np.abs(n_pw - n_theo).max(): 8.4f} \tmean {np.abs(n_pw - n_theo).mean(): 8.4f}')
+
+print(f'    (||w|| - ||w||_teo) / ||w||_teo: max {(np.abs(n_w - n_theo) / n_theo).max(): 8.4f} \tmean {(np.abs(n_w - n_theo) / n_theo).mean(): 8.4f}')
+#print(n_theo)
+
 
 # NC2 cosines
 print('\n' + 10 * '.' + ' NC2 cosines')
@@ -487,274 +491,29 @@ print(f'..... final test majority acc. {maj_acc_test:.4f}')
 print(f'..... final test minority acc. {min_acc_test:.4f}',
       flush=True)
 
+#unos_ts = np.ones(ll_ts.shape[0])
+##w_pred_train = ll @ w + unos.reshape(-1, 1) @ b.reshape(1, -1)
+#w_pred_test = ll_ts @ w + unos_ts.reshape(-1, 1) @ b.reshape(1, -1)
+#
+#maj_acc_test, min_acc_test = majority_minority_accuracy(
+#            w_pred_test,
+#            targs_out_ts,
+#            pr
+#        )
+#print(f'..... final test majority acc. {maj_acc_test:.4f}')
+#print(f'..... final test minority acc. {min_acc_test:.4f}',
+#      flush=True)
+#
+#maj_acc_test, min_acc_test = evaluate_maj_min_preds(
+#        targs_out_ts,
+#        model_out_ts,
+#        fr,
+#        'ye'
+#    )
+#        
+#print(f'..... final test majority acc. {maj_acc_test:.4f}')
+#print(f'..... final test minority acc. {min_acc_test:.4f}',
+#      flush=True)
+
 sys.exit(1)
 
-#checking funny things
-#funny way of computing class probs? Better to use prob function?
-_, counts = np.unique(
-    targs_out,
-    return_counts=True,
-    axis=0
-)
-
-#assumes all majority and minority classes have same number of elements;
-#doesn't use probs above, as frac is not passed
-class_prob = np.sort(
-    counts / counts.sum()
-)[::-1]
-    
-print('intermediate class_prob', class_prob, pr)
-        
-
-
-#test accuracies
-
-#for i in range(x_lhl.shape[0]):
-#        l_n = [np.linalg.norm(x_lhl[i] - ccm.T[j]) for j in range(C)]
-#        y_ncc_pred[i] = np.argmin(np.array(l_n))
-#    
-#    print("conf m of nearest class center prediction\n", 
-#           confusion_matrix(y, y_ncc_pred))
-#    print("acc of nearest class center prediction", 
-#           accuracy_score(y, y_ncc_pred))
-#    print("coincidence of model and ncc predictions", 
-#           accuracy_score(class_pred, y_ncc_pred))
-
-
-print(np.linalg.norm(w - w_on_th @ w_th))
-
-
-
-# train losses
-unos = np.ones(ll.shape[0])
-w_pred_train = ll @ w + unos.reshape(-1, 1) @ b.reshape(1, -1)
-q_pred_train = ll @ q + unos.reshape(-1, 1) @ b.reshape(1, -1)
-
-# w, ccm reduced loss
-H_pi = h_pi(pr)
-w_w_pred = w.T @ w + b.reshape(-1, 1) @ pr.reshape(1, -1)
-w_q_pred = w.T @ q + b.reshape(-1, 1) @ pr.reshape(1, -1)
-q_q_pred = q.T @ q + b.reshape(-1, 1) @ pr.reshape(1, -1)
-
-w_theo_w_theo_pred = w_opt.T @ w_opt + b.reshape(-1, 1) @ pr.reshape(1, -1)
-w_theo_w_pred = w_opt.T @ w + b.reshape(-1, 1) @ pr.reshape(1, -1)
-w_theo_q_pred = w_opt.T @ q + b.reshape(-1, 1) @ pr.reshape(1, -1)
-
-print('\n' + 10 * '.' + 'train, w, ccm mse')
-print(f'mean ||w_pred_train - targs_out||**2.: {np.linalg.norm(w_pred_train - targs_out) ** 2. / ll.shape[0]: .4f}')
-print(f'mean ||q_pred_train - targs_out||**2.: {np.linalg.norm(q_pred_train - targs_out) ** 2. / ll.shape[0]: .4f}')
-
-print(f'\n||w.T @ w + b - H_pi||**2.: {np.linalg.norm(w_w_pred - H_pi) ** 2.: .4f}',  
-      f'\n||w.T @ q + b  - H_pi||**2.: {np.linalg.norm(w_q_pred - H_pi) ** 2.: .4f}',
-      f'\n||q.T @ q + b - H_pi||**2.: {np.linalg.norm(q_q_pred - H_pi) ** 2.: .4f}') 
-
-print(f'\n||w_opt.T @ w_opt + b - H_pi||**2.: {np.linalg.norm(w_theo_w_theo_pred - H_pi) ** 2.: .4f}', 
-      f'\n||w_opt.T @ w + b - H_pi||**2.: {np.linalg.norm(w_theo_w_pred - H_pi) ** 2.: .4f}', 
-      f'\n||w_opt.T @ q + b - H_pi||**2.: {np.linalg.norm(w_theo_q_pred - H_pi) ** 2.: .4f}')
-
-print(f'\n||w.T @ w - H_pi||**2.: {np.linalg.norm(w.T @ w - H_pi) ** 2.: .4f}',  
-      f'\n||w.T @ q - H_pi||**2.: {np.linalg.norm(w.T @ q - H_pi) ** 2.: .4f}',
-      f'\n||q.T @ q - H_pi||**2.: {np.linalg.norm(q.T @ q - H_pi) ** 2.: .4f}') 
-
-# Final w, b norms
-print('\n' + 10 * '.' + 'q, w, q-w, q-w_theo, w-w_theo, b norms')
-print(f'q: {np.linalg.norm(q): .4f}', 
-      f'w: {np.linalg.norm(w): .4f}',  
-      f'q-w: {np.linalg.norm(q-w): .4f}', 
-      f'q-w_opt: {np.linalg.norm(q-w_opt): .4f}',  
-      f'w-w_opt: {np.linalg.norm(w-w_opt): .4f}', 
-      f'b: {np.linalg.norm(b): .4f}')
-
-#print('\n' + 10 * '.' + f'q @ w_opt mean: {np.abs(q.T.dot(w_opt)).mean(): .4f} std: {np.abs(q.T.dot(w_opt)).std(): .4f}')
-
-# Final anchored loss
-print('\n' + 10 * '.' + 'final anchor loss')
-print(f'||w - w_opt.T||**2. / w.shape[0] + ||b||**2.: {np.linalg.norm(w - w_opt) ** 2. / w_opt.shape[0] + np.linalg.norm(b) ** 2.: .4f}')
-
-# Theoretical cos, norm values
-cos_column = (np.sqrt(pr) / np.sqrt(1. - pr)).reshape(-1, 1)
-theo_cos_matrix = -cos_column @ cos_column.T
-theo_cos_matrix += np.eye(n_classes) + np.diag(pr / (1 - pr))
-
-theo_w_norms = np.sqrt(1. - pr)
-theo_ccm_norms = np.sqrt((1. - pr) / pr)
-
-# NC1
-print('\n' + 10 * '.' + ' traces')
-s_with = ff.s_within(ll, label) / ll.shape[0]
-s_betw = ff.s_between(ll, label) / ll.shape[0]
-nc1_tr = np.trace(np.linalg.pinv(s_betw, rcond=1.e-5) @ s_with) / n_classes
-print(f'trace (s_B^+ s_W) / C: {nc1_tr: .6f}')
-
-# NC2 norms
-print('\n' + 10 * '.' + ' NC2 norms')
-nw = np.linalg.norm(w, axis=0)
-nh = np.linalg.norm(ccm, axis=0)
-nq = np.linalg.norm(q, axis=0)
-
-print(f'    ||w|| - ||w_teo||: max {np.abs(nw - theo_w_norms).max(): 8.4f} \tmean {np.abs(nw - theo_w_norms).mean(): 8.4f}')
-print(f'||ccm|| - ||ccm_teo||: max {np.abs(nh - theo_ccm_norms).max(): 8.4f} \tmean {np.abs(nh - theo_ccm_norms).mean(): 8.4f}')
-print(f'    ||q|| - ||q_teo||: max {np.abs(nq - theo_w_norms).max(): 8.4f} \tmean {np.abs(nq - theo_w_norms).mean(): 8.4f}')
-
-# NC2 cosines
-print('\n' + 10 * '.' + ' NC2 cosines')
-ww = w.T @ w
-hh = ccm.T @ ccm
-qq = q.T @ q
-
-normw = nw.reshape(-1, 1) @ nw.reshape(-1, 1).T
-normh = nh.reshape(-1, 1) @ nh.reshape(-1, 1).T
-normq = nq.reshape(-1, 1) @ nq.reshape(-1, 1).T
-
-cos_w = ww / normw
-cos_h = hh / normh
-cos_q = qq / normq
-
-print(f'cos_w - cos_theo max {np.abs(cos_w - theo_cos_matrix).max().round(3)} \tmean {np.abs(cos_w - theo_cos_matrix).mean().round(3)}')
-print(f'cos_h - cos_theo max {np.abs(cos_h - theo_cos_matrix).max().round(3)} \tmean {np.abs(cos_h - theo_cos_matrix).mean().round(3)}')
-print(f'cos_q - cos_theo max {np.abs(cos_q - theo_cos_matrix).max().round(3)} \tmean {np.abs(cos_q - theo_cos_matrix).mean().round(3)}')
-
-#print('max, mean h cos diff', np.abs(cos_h - theo_cos_matrix).max().round(3), np.abs(cos_h - theo_cos_matrix).mean().round(3))
-#print('max, mean q cos diff', np.abs(cos_q - theo_cos_matrix).max().round(3), np.abs(cos_q - theo_cos_matrix).mean().round(3))
-                
-# NC3: w, q collinearity  
-print('\n' + 10 * '.' + ' NC3 n, w collinearity')     
-n_w_ccm_dif = ccm / np.linalg.norm(ccm, axis=0) - w / np.linalg.norm(w, axis=0)
-n_w_q_dif = q / np.linalg.norm(q, axis=0) - w / np.linalg.norm(w, axis=0)
-
-#print(f'collinearity normalized diff: max {np.abs(n_w_ccm_dif).max()} \tmean {np.abs(n_w_ccm_dif).mean()}')
-print('normalized w, ccm norm diffs\n', np.linalg.norm(n_w_ccm_dif, axis=0).round(3))
-print('  normalized w, q norm diffs\n', np.linalg.norm(n_w_q_dif, axis=0).round(3))
-
-# Final w SVD
-uw, sw, vwT = np.linalg.svd(w)
-uq, sq, vqT = np.linalg.svd(q)
-uo, so, voT = np.linalg.svd(w_opt)
-
-uw = uw[:, :10]
-uq = uq[:, :10]
-uo = uo[:, :10]
-
-print('\n' + 10 * '.' + 'SVs of w, q')
-print('w:', sw.round(2))
-print('q:', sq.round(2))
-
-print('mean abs diff uw vs uq:', np.abs(uw - uq).mean().round(3), '\tvwT vs vqT:', np.abs(vwT - vqT).mean().round(3))
-print('mean abs diff uw vs uo:', np.abs(uw - uo).mean().round(3), '\tvwT vs voT:', np.abs(vwT - voT).mean().round(3))
-print('mean abs diff uq vs uo:', np.abs(uq - uo).mean().round(3), '\tvqT vs voT:', np.abs(vqT - voT).mean().round(3))
-
-print('\n' + 10 * '.' + 'orthogonal proj p_W(Q)')
-p_w_opt_q = project_Q_2_W(q, w_opt)
-po_w_opt_q = q - p_w_opt_q
-
-p_w_q = project_Q_2_W(q, w)
-po_w_q = q - p_w_q
-
-p_w_opt_w = project_Q_2_W(w, w_opt)
-po_w_opt_w = w - p_w_opt_w
-
-p_q_opt_w = project_Q_2_W(q, w_opt)
-
-#print('  are W and Q - p_W(Q) orth?', np.allclose(w.T @ po_w_q, np.zeros((q.shape[1], q.shape[1])), atol=1.e-4))
-#print('    are W and p_W(Q) close?', np.allclose(w, p_w_q, atol=1.e-2))
-#
-#print('\n  are W_opt and Q - p_W_opt(Q) orth?', np.allclose(w_opt.T @ po_w_opt_q, np.zeros((q.shape[1], q.shape[1])), atol=1.e-4))
-#print('    are W_opt and p_W_opt(Q) close?', np.allclose(w_opt, p_w_opt_q, atol=1.e-2))
-#
-#print('\n  are W_opt and W - p_W_opt(W) orth?', np.allclose(w_opt.T @ po_w_opt_w, np.zeros((q.shape[1], q.shape[1])), atol=1.e-4))
-#print('    are W_opt and p_W_opt(W) close?', np.allclose(w_opt, p_w_opt_w, atol=1.e-2))
-
-#print('\ncosines of projected w')
-#wowo = p_w_opt_w.T @ p_w_opt_w
-#nwo = np.linalg.norm(p_w_opt_w, axis=0)
-#normwo = nwo.reshape(-1, 1) @ nwo.reshape(-1, 1).T
-#
-#cos_wo = wowo / normwo
-##print(cos_wo)
-#print('max, mean p_w cos - theo cos', np.abs(cos_wo - theo_cos_matrix).max().round(3), np.abs(cos_wo - theo_cos_matrix).mean().round(3))
-
-print('\nProjected w, q vs H_pi')
-print(f'\npw.T @ w - H_pi: \tmax abs diff {np.abs(p_w_opt_w.T @ w - H_pi).max().round(3)} \tmean abs diff {np.abs(p_w_opt_w.T @ w - H_pi).mean().round(3)}')
-print(f'pw.T @ pw - H_pi: \tmax abs diff {np.abs(p_w_opt_w.T @ p_w_opt_w - H_pi).max().round(3)} \tmean abs diff {np.abs(p_w_opt_w.T @ p_w_opt_w - H_pi).mean().round(3)}')
-print(f'pw.T @ q - H_pi: \tmax abs diff {np.abs(p_w_opt_w.T @ q - H_pi).max().round(3)} \tmean abs diff {np.abs(p_q_opt_w.T @ q - H_pi).mean().round(3)}')
-print(f'pw.T @ pq - H_pi: \tmax abs diff {np.abs(p_w_opt_w.T @ p_q_opt_w - H_pi).max().round(3)} \tmean abs diff {np.abs(p_q_opt_w.T @ p_q_opt_w - H_pi).mean().round(3)}')
-print(f'q.T @ q - H_pi: \tmax abs diff {np.abs(p_q_opt_w.T @ p_q_opt_w - H_pi).max().round(3)} \tmean abs diff {np.abs(q.T @ q - H_pi).mean().round(3)}')
-
-print(f'\n||p_w.T @ p_w - H_pi||**2.: {np.linalg.norm(p_w_opt_w.T @ p_w_opt_w - H_pi) ** 2.: .4f}',  
-      f'\n||p_w.T @ q - H_pi||**2.: {np.linalg.norm(p_w_opt_w.T @ q - H_pi) ** 2.: .4f}',
-      f'\n||p_w.T @ p_q - H_pi||**2.: {np.linalg.norm(p_w_opt_w.T @ p_q_opt_w - H_pi) ** 2.: .4f}',
-      f'\n||p_q.T @ p_q - H_pi||**2.: {np.linalg.norm(p_q_opt_w.T @ p_q_opt_w - H_pi) ** 2.: .4f}') 
-
-
-
-#print('same_subspace_residual', same_subspace_residual(w, w_opt, tol=1e-2))
-print('\nDo w, w_opt span the same subspace?')
-cos_thetas = subspace_min_cosine(w, w_opt, tol=1e-2)
-print('min', cos_thetas.min().round(3), 'mean', cos_thetas.mean().round(3), 'std', cos_thetas.std().round(3))
-
-print('\nDo q, w_opt span the same subspace?')
-cos_thetas = subspace_min_cosine(q, w_opt, tol=1e-2)
-print('min', cos_thetas.min().round(3), 'mean', cos_thetas.mean().round(3), 'std', cos_thetas.std().round(3))
-
-print('\nDo q, w span the same subspace?')
-cos_thetas = subspace_min_cosine(q, w, tol=1e-2)
-print('min', cos_thetas.min().round(3), 'mean', cos_thetas.mean().round(3), 'std', cos_thetas.std().round(3))
-
-print('\nDo p_wt(q), w span the same subspace?')
-cos_thetas = subspace_min_cosine(p_q_opt_w, w, tol=1e-2)
-print('min', cos_thetas.min().round(3), 'mean', cos_thetas.mean().round(3), 'std', cos_thetas.std().round(3))
-
-#.....................................................
-print('\nhow close the projections of w and q to w_opt?') 
-A = project_Q_2_W(w, w_opt)
-R = orthogonal_procrustes(A, w_opt)
-
-print("norm distances")
-err = np.linalg.norm(A - R @ w_opt, 'fro')
-print(f"||p(w) - R @ w_opt|| {err.round(3)}")
-
-rel_err = (
-    np.linalg.norm(A - R @ w_opt, 'fro')
-    / np.linalg.norm(w_opt, 'fro')
-)
-print(f"||p(w) - R @ w_opt|| / ||w_opt|| {rel_err.round(3)}")
-
-A = project_Q_2_W(q, w_opt)
-R = orthogonal_procrustes(A, w_opt)
-
-err = np.linalg.norm(A - R @ w_opt, 'fro')
-print(f"\n||p(q) - R @ w_opt|| {err}")
-
-rel_err = (
-    np.linalg.norm(A - R @ w_opt, 'fro')
-    / np.linalg.norm(w_opt, 'fro')
-)
-print(f"||p(q) - R @ w_opt|| / ||w_opt|| {rel_err}")
-
-
-#print(w.T @ q - w.T @ project_Q_2_W(q, w))
-A = project_Q_2_W(w, w_opt)
-#print(A.T @ q - A.T @ project_Q_2_W(q, w))
-
-print("\nmax, mean std for p_wopt(w).T @ q - p_wopt(w).T @ p_w(q)")
-print(np.abs(A.T @ q - A.T @ project_Q_2_W(q, w)).max().round(3),
-      #np.abs(w.T @ q - w.T @ project_Q_2_W(q, w)).max(),
-      np.abs(A.T @ q - A.T @ project_Q_2_W(q, w)).mean().round(3),
-      np.abs(A.T @ q - A.T @ project_Q_2_W(q, w)).std().round(3))
-
-print("\nmax, mean std for wopt.T @ q - wopt.T @ p_w(q)")
-print(np.abs(w_opt.T @ q - w_opt.T @ project_Q_2_W(q, w)).max().round(3),
-      np.abs(w_opt.T @ q - w_opt.T @ project_Q_2_W(q, w)).mean().round(3),
-      np.abs(w_opt.T @ q - w_opt.T @ project_Q_2_W(q, w)).std().round(3))
-      
-print("\nbehavior of p_w(q):")
-#add cos(p_w(q), cos_theo)
-q_w = project_Q_2_W(q, w)
-nq_w = np.linalg.norm(q_w, axis=0)
-print(f'    ||q_w|| - ||w_teo||: max {np.abs(nq_w - theo_w_norms).max(): 8.4f} \tmean {np.abs(nq_w - theo_w_norms).mean(): 8.4f}')
-#print(f'    ||q_w|| - ||w_teo||: max {np.abs(nq_w.reshape(-1, 1) - theo_w_norms.reshape(-1, 1)).max(): 8.4f} \tmean {np.abs(nq_w.reshape(-1, 1) - theo_w_norms.reshape(-1, 1)).mean(): 8.4f}')
-
-cos_q_w = (q_w.T @ q_w) / (nq_w.reshape(-1, 1) @ nq_w.reshape(1, -1))
-
-print('|cos_q_w - cos_theo|: \tmax', np.abs(cos_q_w - theo_cos_matrix).max().round(3), 
-      '\tmean', np.abs(cos_q_w - theo_cos_matrix).mean().round(3)) 
