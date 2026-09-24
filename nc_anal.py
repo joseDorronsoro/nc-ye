@@ -28,7 +28,11 @@ parser.add_argument("--epochs", type=int, default=350, help="Total epochs (defau
 parser.add_argument("--warm_epochs", type=int, default=20, help="Warmup epochs (default: 20)")
 parser.add_argument("--l_anc", type=float, default=0., help="Anchor loss weight lambda_anc (default: 0.)")
 parser.add_argument("--l_center", type=float, default=0., help="Center loss weight lambda_center (default: 0.)")
-parser.add_argument("--results_dir", type=str, default="/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/", help="Directory containing joblib files (default: /home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/)")
+#/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/mnist/frac_0.005_192_1.0:
+#parser.add_argument("--results_dir", type=str, default="/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/", 
+#                    help="Directory containing joblib files (default: /home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/)")
+parser.add_argument("--results_str", type=str, default="0.005_192_1.0",
+                    help="Folder str containing joblib files (default: 0.005_192_1.0)")
 
 args = parser.parse_args()
 
@@ -43,7 +47,8 @@ epochs = args.epochs
 warm_epochs = args.warm_epochs
 l_anc = args.l_anc
 l_center = args.l_center
-results_dir = args.results_dir
+results_str = args.results_str
+results_dir = "/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/mnist/frac_" + results_str
 
 # Handle conditional defaults for learning rate factor
 if args.lrf is not None:
