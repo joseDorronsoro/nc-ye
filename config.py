@@ -316,7 +316,12 @@ def get_paths(cfg):
             "/home/jdorrons/ongoing/"
             "nn_collapse/results/"
         )
-
+        
+        #folder to save results when only one rep 
+        exp_1_dir = (
+            f"/home/jdorrons/ongoing/nn_collapse/results/exps_nc-ye/"
+        )
+        
     elif 'hoya' in host_name or 'casarrubuelos' in host_name:
 
         data_dir = (
@@ -330,7 +335,12 @@ def get_paths(cfg):
             "jdorrons/ongoing/"
             "nn_collapse/"
         )
-
+        
+        #folder to save results when only one rep 
+        exp_1_dir = (
+            f"/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/"
+        )
+    
     else:
         sys.exit('unknown host')
         
@@ -356,14 +366,14 @@ def get_paths(cfg):
     )
 
     #folder to save results when only one rep 
-    exp_1_dir = (
-        f"/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/"
-    )
-    
-    Path(exp_1_dir).mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    #exp_1_dir = (
+    #    f"/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/nc-ye_exps/"
+    #)
+    #
+    #Path(exp_1_dir).mkdir(
+    #    parents=True,
+    #    exist_ok=True,
+    #)
 
     print("results_dir:", results_dir,
           "\n  exp_1_dir:", exp_1_dir)

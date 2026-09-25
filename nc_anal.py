@@ -5,6 +5,7 @@ import sys
 import argparse
 import numpy as np
 import joblib
+import socket
 
 from sklearn.metrics import accuracy_score
 
@@ -25,7 +26,7 @@ parser.add_argument("--bs", type=int, default=192, help="Batch size (default: 19
 parser.add_argument("--wd", type=float, default=0.0005, help="Weight decay (default: 0.0005)")
 parser.add_argument("--hrd", type=float, default=0., help="Feature norm regularization lambda_h (default: 0.)")
 parser.add_argument("--epochs", type=int, default=350, help="Total epochs (default: 600)")
-parser.add_argument("--warm_epochs", type=int, default=20, help="Warmup epochs (default: 20)")
+parser.add_argument("--warm_epochs", type=int, default=0, help="Warmup epochs (default: 0)")
 parser.add_argument("--l_anc", type=float, default=0., help="Anchor loss weight lambda_anc (default: 0.)")
 parser.add_argument("--l_center", type=float, default=0., help="Center loss weight lambda_center (default: 0.)")
 #/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/mnist/frac_0.005_192_1.0:
@@ -48,7 +49,20 @@ warm_epochs = args.warm_epochs
 l_anc = args.l_anc
 l_center = args.l_center
 results_str = args.results_str
-results_dir = "/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/mnist/frac_" + results_str
+
+host_name = socket.gethostname()
+print(host_name)
+
+#folder to save results when only one rep 
+if "spark" in host_name:
+    results_dir = (
+        f"/home/jdorrons/ongoing/nn_collapse/results/exps_nc-ye/"
+    )
+    
+elif 'hoya' in host_name or 'casarrubuelos' in host_name:
+    results_dir = "/home/proyectos/ada2/jdorrons/ongoing/nn_collapse/mnist/frac_" + results_str
+
+print(results_dir)
 
 # Handle conditional defaults for learning rate factor
 if args.lrf is not None:
