@@ -425,7 +425,7 @@ if __name__ == "__main__":
                 rep_number=0,
             )
         
-        if cfg.save_results:
+        if cfg.save_results == 1:
             #save all runs results
             save_experiment_results(
                 train_results,
